@@ -561,6 +561,8 @@ function playAudioBase64(btn, msgId) {
     currentPlayingAudio.pause();
     const prevBtn = document.getElementById(`btn-play-${currentPlayingAudio._msgId}`);
     if (prevBtn) prevBtn.innerHTML = PLAY_SVG;
+    const prevBar = document.getElementById(`bar-${currentPlayingAudio._msgId}`);
+    if (prevBar) prevBar.style.width = "0%";
   }
 
   const audio = new Audio(base64Src);
@@ -585,7 +587,6 @@ function playAudioBase64(btn, msgId) {
     btn.innerHTML = PAUSE_SVG;
   }).catch(err => {
     console.error("Error reproduciendo audio:", err);
-    alert("No se pudo reproducir el audio en este dispositivo.");
   });
 }
 
