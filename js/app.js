@@ -33,6 +33,14 @@ function showMainScreen(nick) {
 
   loadRecentChats();
   loadSocialData();
+
+  // Polling periódico para recibir solicitudes de amistad, estados y chats nuevos
+  setInterval(() => {
+    loadSocialData();
+    if (document.getElementById("tab-content-chats").classList.contains("active")) {
+      loadRecentChats();
+    }
+  }, 4000);
 }
 
 function updateMyAvatarUI(nick) {
@@ -64,6 +72,7 @@ function changeMyProfileAvatar(e) {
       if (Array.isArray(extra)) extra = {};
       extra.avatar = base64Avatar;
       await PapuApi.updateUser(nick, { secretAchievements: extra });
+      alert("¡Foto de perfil actualizada!");
     } catch (err) {
       console.warn("Avatar guardado localmente:", err);
     }
@@ -88,7 +97,7 @@ function switchNavTab(tab) {
   if (tab === "friends") loadSocialData();
 }
 
-/* Sistema de Estados / Historias (24 horas) */
+/* Sistema de Estados / Historias Remotas (24 horas sincronizadas) */
 async function uploadMyStatus(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -104,6 +113,17 @@ async function uploadMyStatus(e) {
       time: Date.now()
     };
 
+    // Guardar en la nube (Perfil de usuario) para que todos los amigos lo vean
+    try {
+      const profile = await PapuApi.getUserProfile(myNick);
+      let extra = profile.secretAchievements || profile.secret_achievements || {};
+      if (Array.isArray(extra)) extra = {};
+      extra.current_status = newStatus;
+      await PapuApi.updateUser(myNick, { secretAchievements: extra });
+    } catch (err) {
+      console.warn("Error subiendo estado remoto:", err);
+    }
+
     let allStatuses = JSON.parse(localStorage.getItem("papuwhats_statuses") || "[]");
     allStatuses.unshift(newStatus);
     localStorage.setItem("papuwhats_statuses", JSON.stringify(allStatuses));
@@ -111,28 +131,47 @@ async function uploadMyStatus(e) {
     if (window.AndroidNative && window.AndroidNative.vibratePhone) {
       window.AndroidNative.vibratePhone();
     }
-    alert("¡Estado publicado por 24 horas!");
+    alert("¡Estado publicado en la nube por 24 horas!");
     loadStatuses();
   };
   reader.readAsDataURL(file);
 }
 
-function loadStatuses() {
+async function loadStatuses() {
   const listEl = document.getElementById("statuses-list");
-  let allStatuses = JSON.parse(localStorage.getItem("papuwhats_statuses") || "[]");
   const now = Date.now();
   const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+  const myNick = (localStorage.getItem("papuwhats_nick") || "").toLowerCase();
 
-  // Filtrar estados que tengan menos de 24 horas
-  allStatuses = allStatuses.filter(s => (now - s.time) < TWENTY_FOUR_HOURS);
-  localStorage.setItem("papuwhats_statuses", JSON.stringify(allStatuses));
+  let statuses = [];
 
-  if (allStatuses.length === 0) {
+  // 1. Obtener estados de amigos desde la API
+  try {
+    const allUsers = await PapuApi.getAllUsers();
+    allUsers.forEach(u => {
+      const uNick = u.nick || u.username || "";
+      const extra = u.secretAchievements || u.secret_achievements || {};
+      if (extra && extra.current_status && extra.current_status.image) {
+        if ((now - (extra.current_status.time || 0)) < TWENTY_FOUR_HOURS) {
+          statuses.push(extra.current_status);
+        }
+      }
+    });
+  } catch (err) {
+    console.warn("Cargando estados locales:", err);
+  }
+
+  if (statuses.length === 0) {
+    let localStatuses = JSON.parse(localStorage.getItem("papuwhats_statuses") || "[]");
+    statuses = localStatuses.filter(s => (now - s.time) < TWENTY_FOUR_HOURS);
+  }
+
+  if (statuses.length === 0) {
     listEl.innerHTML = '<div class="empty-state">No hay estados recientes de tus amigos.</div>';
     return;
   }
 
-  listEl.innerHTML = allStatuses.map(s => {
+  listEl.innerHTML = statuses.map(s => {
     const elapsedMinutes = Math.floor((now - s.time) / 60000);
     const timeText = elapsedMinutes < 60 ? `Hace ${elapsedMinutes}m` : `Hace ${Math.floor(elapsedMinutes / 60)}h`;
     const customAvatar = localStorage.getItem(`avatar_${s.user.toLowerCase()}`);

@@ -158,15 +158,22 @@ function applyCustomChatWallpaper() {
 /* Responder / Citar Mensaje */
 function startReplyToMessage() {
   if (!selectedMessageData) return;
+
+  let cleanQuoteText = selectedMessageData.text || "";
+  if (cleanQuoteText.startsWith("data:image/")) cleanQuoteText = "📷 Foto";
+  else if (cleanQuoteText.startsWith("data:audio/")) cleanQuoteText = "🎤 Nota de voz";
+  else if (cleanQuoteText.startsWith("STICKER:") || cleanQuoteText.startsWith("data:sticker/")) cleanQuoteText = "🎨 Sticker";
+  else if (cleanQuoteText.length > 50) cleanQuoteText = cleanQuoteText.substring(0, 50) + "...";
+
   currentQuotedMessage = {
     id: selectedMessageData.id,
     user: selectedMessageData.partner,
-    text: selectedMessageData.text
+    text: cleanQuoteText
   };
 
   const replyBar = document.getElementById("reply-preview-bar");
   document.getElementById("reply-preview-user").textContent = `Respondiendo a ${currentQuotedMessage.user}`;
-  document.getElementById("reply-preview-text").textContent = currentQuotedMessage.text;
+  document.getElementById("reply-preview-text").textContent = cleanQuoteText;
   replyBar.classList.remove("hidden");
 
   hideMsgModal();
@@ -179,14 +186,20 @@ function cancelReplyQuote() {
   if (replyBar) replyBar.classList.add("hidden");
 }
 
-/* Reaccionar a Mensaje con Emojis */
-function reactToMessage(emoji) {
-  if (!selectedMessageId) return;
+/* Reaccionar a Mensaje con Emojis (Sincronizado remotamente) */
+async function reactToMessage(emoji) {
+  if (!selectedMessageId || !activeChatPartner) return;
   let allReactions = JSON.parse(localStorage.getItem("papuwhats_msg_reactions") || "{}");
   allReactions[selectedMessageId] = emoji;
   localStorage.setItem("papuwhats_msg_reactions", JSON.stringify(allReactions));
 
   hideMsgModal();
+
+  // Transmitir reacción a la conversación como evento
+  try {
+    await PapuApi.sendPrivateMessage(activeChatPartner, `[REACT:${selectedMessageId}:${emoji}]`, "reaction");
+  } catch (err) {}
+
   loadChatMessages(false);
 }
 
@@ -208,6 +221,17 @@ async function loadChatMessages(forceScroll = false) {
       const partner = activeChatPartner.toLowerCase();
       const id = String(msg.id || msg._id || msg.createdAt);
       if (deletedIds.includes(id)) return false;
+
+      // Si es un mensaje de reacción sincronizado, guardar en el mapa y no renderizar como burbuja
+      const text = msg.msg || msg.text || "";
+      if (text.startsWith("[REACT:")) {
+        const parts = text.substring(7, text.length - 1).split(":");
+        if (parts.length >= 2) {
+          reactionsMap[parts[0]] = parts[1];
+        }
+        return false;
+      }
+
       return (from === myNick && to === partner) || (from === partner && to === myNick);
     });
 

@@ -14,6 +14,20 @@ async function loadSocialData() {
   currentFriends = extra.friends || [];
   pendingRequests = extra.friend_requests_pending || [];
 
+  // Sincronizar avatares de todos los amigos
+  for (const fNick of [...currentFriends, ...pendingRequests]) {
+    if (!localStorage.getItem(`avatar_${fNick.toLowerCase()}`)) {
+      PapuApi.getUserProfile(fNick).then(p => {
+        if (p) {
+          const fExtra = p.secretAchievements || p.secret_achievements || {};
+          if (fExtra.avatar) {
+            localStorage.setItem(`avatar_${fNick.toLowerCase()}`, fExtra.avatar);
+          }
+        }
+      });
+    }
+  }
+
   renderFriendsList();
   renderRequestsList();
 }
