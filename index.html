@@ -95,10 +95,13 @@
           Estados
         </button>
         <button id="nav-starred" class="nav-btn" onclick="switchNavTab('starred')">
-          ⭐ Destacados
+          Destacados
         </button>
         <button id="nav-friends" class="nav-btn" onclick="switchNavTab('friends')">
           Amigos <span id="badge-requests" class="badge hidden">0</span>
+        </button>
+        <button id="nav-settings" class="nav-btn" onclick="switchNavTab('settings')">
+          Ajustes
         </button>
       </nav>
 
@@ -115,7 +118,7 @@
         <div class="status-my-card">
           <label class="status-add-btn">
             <input type="file" accept="image/*" onchange="uploadMyStatus(event)" style="display:none;">
-            <div class="avatar-circle status-add-avatar">➕</div>
+            <div class="avatar-circle status-add-avatar">+</div>
             <div>
               <div style="font-weight:600; font-size:14px;">Mi Estado</div>
               <div style="font-size:12px; color:var(--text-secondary);">Toca para subir una foto de 24h</div>
@@ -133,7 +136,7 @@
       <!-- Tab 3: Mensajes Destacados -->
       <div id="tab-content-starred" class="tab-view">
         <div class="section-block">
-          <h3>Mensajes Guardados con Estrella ⭐</h3>
+          <h3>Mensajes Destacados</h3>
           <div id="starred-list" class="list-container">
             <div class="empty-state">No tienes mensajes destacados guardados.</div>
           </div>
@@ -153,6 +156,35 @@
           <h3>Lista de Amigos</h3>
           <div id="friends-list" class="list-container">
             <div class="empty-state">No has agregado amigos aún.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 5: Ajustes / Configuración -->
+      <div id="tab-content-settings" class="tab-view">
+        <div class="section-block">
+          <h3>Configuración de Cuenta</h3>
+          <div class="settings-card">
+            <div class="settings-row">
+              <label class="settings-btn-action" style="cursor:pointer; width:100%;">
+                <input type="file" accept="image/*" onchange="changeMyProfileAvatar(event)" style="display:none;">
+                <div style="font-weight:600; font-size:14px;">Foto de Perfil</div>
+                <div style="font-size:12px; color:var(--text-secondary);">Toca para seleccionar nueva foto</div>
+              </label>
+            </div>
+            <div class="settings-row" style="margin-top:12px;">
+              <label class="settings-btn-action" style="cursor:pointer; width:100%;">
+                <input type="file" accept="image/*" onchange="changeChatWallpaper(event)" style="display:none;">
+                <div style="font-weight:600; font-size:14px;">Fondo de Chat Predeterminado</div>
+                <div style="font-size:12px; color:var(--text-secondary);">Elige un wallpaper personalizado</div>
+              </label>
+            </div>
+            <div class="settings-row" style="margin-top:12px;">
+              <button class="danger-btn" style="width:100%;" onclick="clearAllStickers()">Vaciar Colección de Stickers</button>
+            </div>
+            <div class="settings-row" style="margin-top:12px;">
+              <button class="secondary-btn" style="width:100%;" onclick="logout()">Cerrar Sesión</button>
+            </div>
           </div>
         </div>
       </div>
@@ -212,7 +244,7 @@
 
       <!-- Barra de Grabación de Nota de Voz -->
       <div id="recording-bar" class="recording-bar hidden">
-        <button type="button" class="recording-cancel-btn" onclick="cancelVoiceRecording()">🗑️ Cancelar</button>
+        <button type="button" class="recording-cancel-btn" onclick="cancelVoiceRecording()">Cancelar</button>
         <div class="recording-indicator">
           <span class="rec-dot">●</span>
           <span id="recording-timer">00:00</span>
@@ -291,12 +323,12 @@
       <div class="editor-header">
         <button class="icon-btn" onclick="cancelPhotoEdit()" title="Descartar">✕</button>
         <div class="editor-tools">
-          <button id="tool-draw-btn" class="editor-tool-btn active" onclick="setEditorMode('draw')" title="Lápiz">✏️ Dibujar</button>
+          <button id="tool-draw-btn" class="editor-tool-btn active" onclick="setEditorMode('draw')" title="Lápiz">Dibujar</button>
           <input type="color" id="draw-color-picker" value="#00a884" title="Color" onchange="setDrawColor(this.value)">
-          <button id="tool-crop-btn" class="editor-tool-btn" onclick="setEditorMode('crop')" title="Recortar">✂️ Recortar</button>
-          <button class="editor-tool-btn" onclick="resetEditorCanvas()" title="Restablecer">↺</button>
+          <button id="tool-crop-btn" class="editor-tool-btn" onclick="setEditorMode('crop')" title="Recortar">Recortar</button>
+          <button class="editor-tool-btn" onclick="resetEditorCanvas()" title="Restablecer">Deshacer</button>
         </div>
-        <button class="primary-btn editor-send-btn" onclick="sendEditedPhoto()">Enviar ✓</button>
+        <button class="primary-btn editor-send-btn" onclick="sendEditedPhoto()">Enviar</button>
       </div>
       <div class="editor-canvas-container" id="canvas-container">
         <canvas id="editor-canvas"></canvas>
@@ -332,11 +364,11 @@
         <h3 style="margin-top:10px;">Opciones del Mensaje</h3>
         <input type="text" id="edit-msg-input" placeholder="Editar texto...">
         <div class="modal-actions" style="margin-top:14px; flex-wrap:wrap; gap:6px;">
-          <button class="primary-btn" style="flex:1;" onclick="startReplyToMessage()">↩️ Responder</button>
-          <button class="secondary-btn" id="btn-star-msg" onclick="toggleStarSelectedMessage()">⭐ Destacar</button>
-          <button class="danger-btn" onclick="confirmDeleteMessage()">🗑️ Eliminar</button>
+          <button class="primary-btn" style="flex:1;" onclick="startReplyToMessage()">Responder</button>
+          <button class="secondary-btn" id="btn-star-msg" onclick="toggleStarSelectedMessage()">Destacar</button>
+          <button class="danger-btn" onclick="confirmDeleteMessage()">Eliminar</button>
           <button class="secondary-btn" onclick="hideMsgModal()">Cancelar</button>
-          <button class="primary-btn" onclick="confirmEditMessage()">💾 Guardar</button>
+          <button class="primary-btn" onclick="confirmEditMessage()">Guardar</button>
         </div>
       </div>
     </div>

@@ -608,7 +608,7 @@ function openMsgMenu(e, id) {
   
   let starredIds = JSON.parse(localStorage.getItem("starred_msg_ids") || "[]");
   const isStarred = starredIds.includes(id);
-  document.getElementById("btn-star-msg").textContent = isStarred ? "⭐ Desmarcar" : "⭐ Destacar";
+  document.getElementById("btn-star-msg").textContent = isStarred ? "Desmarcar" : "Destacar";
 
   document.getElementById("modal-msg-actions").classList.remove("hidden");
 }

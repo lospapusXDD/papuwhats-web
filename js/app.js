@@ -85,11 +85,15 @@ function switchNavTab(tab) {
   document.getElementById("nav-statuses").classList.toggle("active", tab === "statuses");
   document.getElementById("nav-starred").classList.toggle("active", tab === "starred");
   document.getElementById("nav-friends").classList.toggle("active", tab === "friends");
+  const navSettings = document.getElementById("nav-settings");
+  if (navSettings) navSettings.classList.toggle("active", tab === "settings");
 
   document.getElementById("tab-content-chats").classList.toggle("active", tab === "chats");
   document.getElementById("tab-content-statuses").classList.toggle("active", tab === "statuses");
   document.getElementById("tab-content-starred").classList.toggle("active", tab === "starred");
   document.getElementById("tab-content-friends").classList.toggle("active", tab === "friends");
+  const tabSettings = document.getElementById("tab-content-settings");
+  if (tabSettings) tabSettings.classList.toggle("active", tab === "settings");
 
   if (tab === "chats") loadRecentChats();
   if (tab === "statuses") loadStatuses();

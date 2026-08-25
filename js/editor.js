@@ -32,6 +32,9 @@ function openPhotoEditor(dataUrl) {
   img.src = dataUrl;
 }
 
+let isCropping = false;
+let canvasSnapshotBeforeCrop = null;
+
 function initEditorEvents() {
   const canvas = document.getElementById("editor-canvas");
   const ctx = canvas.getContext("2d");
@@ -61,8 +64,10 @@ function initEditorEvents() {
       ctx.fillStyle = drawColor;
       ctx.fill();
     } else if (editorMode === 'crop') {
+      isCropping = true;
       cropStart = pos;
       cropEnd = pos;
+      canvasSnapshotBeforeCrop = ctx.getImageData(0, 0, canvas.width, canvas.height);
     }
   };
 
@@ -80,19 +85,48 @@ function initEditorEvents() {
       ctx.stroke();
       lastX = pos.x;
       lastY = pos.y;
-    } else if (editorMode === 'crop' && cropStart) {
+    } else if (editorMode === 'crop' && isCropping && cropStart) {
       e.preventDefault();
       cropEnd = getCanvasPos(e);
+
+      // Restaurar imagen previa y dibujar la caja de recorte visible en tiempo real
+      if (canvasSnapshotBeforeCrop) {
+        ctx.putImageData(canvasSnapshotBeforeCrop, 0, 0);
+      }
+
+      const x = Math.min(cropStart.x, cropEnd.x);
+      const y = Math.min(cropStart.y, cropEnd.y);
+      const w = Math.abs(cropEnd.x - cropStart.x);
+      const h = Math.abs(cropEnd.y - cropStart.y);
+
+      // Sombra oscura fuera de la selección
+      ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
+      ctx.fillRect(0, 0, canvas.width, y); // Arriba
+      ctx.fillRect(0, y, x, h); // Izquierda
+      ctx.fillRect(x + w, y, canvas.width - (x + w), h); // Derecha
+      ctx.fillRect(0, y + h, canvas.width, canvas.height - (y + h)); // Abajo
+
+      // Borde verde brillante punteado y esquinas
+      ctx.strokeStyle = "#00a884";
+      ctx.lineWidth = 3;
+      ctx.setLineDash([6, 6]);
+      ctx.strokeRect(x, y, w, h);
+      ctx.setLineDash([]);
     }
   };
 
   canvas.onmouseup = canvas.ontouchend = (e) => {
     if (editorMode === 'draw') {
       isDrawing = false;
-    } else if (editorMode === 'crop' && cropStart && cropEnd) {
+    } else if (editorMode === 'crop' && isCropping && cropStart && cropEnd) {
+      isCropping = false;
+      if (canvasSnapshotBeforeCrop) {
+        ctx.putImageData(canvasSnapshotBeforeCrop, 0, 0);
+      }
       executeCrop(cropStart, cropEnd);
       cropStart = null;
       cropEnd = null;
+      canvasSnapshotBeforeCrop = null;
     }
   };
 }
@@ -106,7 +140,7 @@ function executeCrop(start, end) {
   const w = Math.abs(end.x - start.x);
   const h = Math.abs(end.y - start.y);
 
-  if (w < 20 || h < 20) return; // Evitar recortes microscópicos accidentales
+  if (w < 20 || h < 20) return; // Evitar recortes accidentales
 
   const croppedData = ctx.getImageData(x, y, w, h);
   canvas.width = w;

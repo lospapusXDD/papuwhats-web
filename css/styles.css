@@ -1256,7 +1256,27 @@ body, html {
   cursor: pointer;
 }
 
-.audio-speed-btn:hover {
-  background: var(--accent-green);
-  color: #0b141a;
+/* Ajustes / Configuración */
+.settings-card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  padding: 16px;
+}
+
+.settings-row {
+  display: flex;
+  flex-direction: column;
+}
+
+.settings-btn-action {
+  display: block;
+  padding: 10px 12px;
+  background: var(--bg-panel);
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+}
+
+.settings-btn-action:active {
+  border-color: var(--accent-green);
 }

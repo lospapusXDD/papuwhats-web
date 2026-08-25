@@ -99,7 +99,7 @@ async function switchPickerTab(tab) {
     allStickersHtml += `
       <label class="create-sticker-btn" title="Importar Pack de Stickers" style="background: rgba(0, 168, 132, 0.15); border-color: var(--accent-green);">
         <input type="file" accept=".webp,image/*" multiple onchange="importMultipleStickers(event)" style="display:none;">
-        <span style="font-size:10px; text-align:center;">📥 Importar<br>Pack (${userStickers.length})</span>
+        <span style="font-size:10px; text-align:center;">Importar<br>Pack (${userStickers.length})</span>
       </label>
     `;
 
@@ -107,7 +107,7 @@ async function switchPickerTab(tab) {
     allStickersHtml += `
       <label class="create-sticker-btn" title="Crear 1 Sticker">
         <input type="file" accept="image/*" onchange="createCustomSticker(event)" style="display:none;">
-        <span>➕ Crear</span>
+        <span>Crear</span>
       </label>
     `;
 
@@ -216,16 +216,16 @@ async function addExternalSticker() {
   switchPickerTab('stickers');
 }
 
-async function onExternalStickerImported(dataUrl) {
-  try {
-    await saveStickerToDB(dataUrl);
-  } catch (err) {}
-  if (emojiPickerOpen && activeTabPicker === 'stickers') {
-    switchPickerTab('stickers');
+async function clearAllStickers() {
+  if (confirm("¿Estás seguro de que deseas borrar toda tu colección de stickers guardados?")) {
+    const db = await getDB();
+    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const store = tx.objectStore(STORE_NAME);
+    store.clear();
+    tx.oncomplete = () => {
+      localStorage.removeItem('my_custom_stickers');
+      alert("Colección de stickers vaciada correctamente.");
+    };
   }
-  if (window.AndroidNative && window.AndroidNative.vibratePhone) {
-    window.AndroidNative.vibratePhone();
-  }
-  alert("¡Sticker importado y guardado en tu colección de papuWhats!");
 }
-window.onExternalStickerImported = onExternalStickerImported;
+window.clearAllStickers = clearAllStickers;
