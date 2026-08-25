@@ -28,6 +28,11 @@ function showMainScreen(nick) {
   document.getElementById("my-nick").textContent = nick;
   updateMyAvatarUI(nick);
 
+  // Solicitar permiso de Notificaciones de Escritorio para PC / Web
+  if ("Notification" in window && Notification.permission === "default") {
+    Notification.requestPermission();
+  }
+
   PapuApi.sendHeartbeat(nick);
   setInterval(() => PapuApi.sendHeartbeat(nick), 10000);
 
@@ -41,6 +46,44 @@ function showMainScreen(nick) {
       loadRecentChats();
     }
   }, 4000);
+}
+
+// Emisor Universal de Notificaciones (PC / Android)
+function triggerAppNotification(sender, messageText) {
+  // 1. Android Nativo
+  if (window.AndroidNative && window.AndroidNative.showNotification) {
+    window.AndroidNative.showNotification(sender, messageText);
+  }
+  // 2. Navegador PC / Web Notifications API
+  else if ("Notification" in window && Notification.permission === "granted") {
+    try {
+      new Notification(`papuWhats - ${sender}`, {
+        body: messageText,
+        icon: "icon.png"
+      });
+    } catch (e) {}
+  }
+
+  // Sonido suave de notificación web con Web Audio API
+  playNotificationSound();
+}
+window.triggerAppNotification = triggerAppNotification;
+
+function playNotificationSound() {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(587.33, ctx.currentTime); // D5
+    osc.frequency.exponentialRampToValueAtTime(880, ctx.currentTime + 0.15); // A5
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.25);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.25);
+  } catch (e) {}
 }
 
 function updateMyAvatarUI(nick) {

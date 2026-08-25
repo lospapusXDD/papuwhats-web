@@ -245,6 +245,21 @@ async function loadChatMessages(forceScroll = false) {
       const msgId = String(msg.id || msg._id || msg.createdAt);
       if (!seenMessageIds.has(msgId)) {
         seenMessageIds.add(msgId);
+
+        const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
+        if (from === activeChatPartner.toLowerCase() && from !== myNick && seenMessageIds.size > 1) {
+          let notifText = msg.msg || msg.text || "";
+          if (notifText.startsWith("data:audio/")) {
+            notifText = "Nota de voz";
+          } else if (notifText.startsWith("data:image/")) {
+            notifText = "Foto";
+          } else if (notifText.startsWith("STICKER:") || notifText.startsWith("data:sticker/") || msg.mediaType === "sticker") {
+            notifText = "Sticker";
+          }
+          if (window.triggerAppNotification) {
+            window.triggerAppNotification(activeChatPartner, notifText);
+          }
+        }
       }
     });
 
