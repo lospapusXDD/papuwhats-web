@@ -1,0 +1,283 @@
+let currentAuthTab = "login";
+
+document.addEventListener("DOMContentLoaded", () => {
+  checkSession();
+});
+
+function checkSession() {
+  const token = PapuApi.getToken();
+  const nick = localStorage.getItem("papuwhats_nick");
+
+  if (token && nick) {
+    showMainScreen(nick);
+  } else {
+    showAuthScreen();
+  }
+}
+
+function showAuthScreen() {
+  document.getElementById("auth-screen").classList.add("active");
+  document.getElementById("main-screen").classList.remove("active");
+  document.getElementById("chat-room").classList.remove("active");
+}
+
+function showMainScreen(nick) {
+  document.getElementById("auth-screen").classList.remove("active");
+  document.getElementById("main-screen").classList.add("active");
+
+  document.getElementById("my-nick").textContent = nick;
+  updateMyAvatarUI(nick);
+
+  PapuApi.sendHeartbeat(nick);
+  setInterval(() => PapuApi.sendHeartbeat(nick), 10000);
+
+  loadRecentChats();
+  loadSocialData();
+}
+
+function updateMyAvatarUI(nick) {
+  const avatarEl = document.getElementById("my-avatar");
+  const customAvatar = localStorage.getItem(`avatar_${nick.toLowerCase()}`);
+  if (customAvatar) {
+    avatarEl.innerHTML = `<img src="${customAvatar}" class="avatar-circle-img">`;
+  } else {
+    avatarEl.textContent = nick.charAt(0).toUpperCase();
+  }
+}
+
+function changeMyProfileAvatar(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const nick = localStorage.getItem("papuwhats_nick");
+  if (!nick) return;
+
+  const reader = new FileReader();
+  reader.onload = async function(event) {
+    const base64Avatar = event.target.result;
+    localStorage.setItem(`avatar_${nick.toLowerCase()}`, base64Avatar);
+    updateMyAvatarUI(nick);
+    
+    try {
+      const profile = await PapuApi.getUserProfile(nick);
+      let extra = profile.secretAchievements || profile.secret_achievements || {};
+      if (Array.isArray(extra)) extra = {};
+      extra.avatar = base64Avatar;
+      await PapuApi.updateUser(nick, { secretAchievements: extra });
+    } catch (err) {
+      console.warn("Avatar guardado localmente:", err);
+    }
+  };
+  reader.readAsDataURL(file);
+}
+
+function switchNavTab(tab) {
+  document.getElementById("nav-chats").classList.toggle("active", tab === "chats");
+  document.getElementById("nav-statuses").classList.toggle("active", tab === "statuses");
+  document.getElementById("nav-starred").classList.toggle("active", tab === "starred");
+  document.getElementById("nav-friends").classList.toggle("active", tab === "friends");
+
+  document.getElementById("tab-content-chats").classList.toggle("active", tab === "chats");
+  document.getElementById("tab-content-statuses").classList.toggle("active", tab === "statuses");
+  document.getElementById("tab-content-starred").classList.toggle("active", tab === "starred");
+  document.getElementById("tab-content-friends").classList.toggle("active", tab === "friends");
+
+  if (tab === "chats") loadRecentChats();
+  if (tab === "statuses") loadStatuses();
+  if (tab === "starred") loadStarredMessages();
+  if (tab === "friends") loadSocialData();
+}
+
+/* Sistema de Estados / Historias (24 horas) */
+async function uploadMyStatus(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const myNick = localStorage.getItem("papuwhats_nick");
+  if (!myNick) return;
+
+  const reader = new FileReader();
+  reader.onload = async function(event) {
+    const base64Img = event.target.result;
+    const newStatus = {
+      user: myNick,
+      image: base64Img,
+      time: Date.now()
+    };
+
+    let allStatuses = JSON.parse(localStorage.getItem("papuwhats_statuses") || "[]");
+    allStatuses.unshift(newStatus);
+    localStorage.setItem("papuwhats_statuses", JSON.stringify(allStatuses));
+
+    if (window.AndroidNative && window.AndroidNative.vibratePhone) {
+      window.AndroidNative.vibratePhone();
+    }
+    alert("¡Estado publicado por 24 horas!");
+    loadStatuses();
+  };
+  reader.readAsDataURL(file);
+}
+
+function loadStatuses() {
+  const listEl = document.getElementById("statuses-list");
+  let allStatuses = JSON.parse(localStorage.getItem("papuwhats_statuses") || "[]");
+  const now = Date.now();
+  const TWENTY_FOUR_HOURS = 24 * 60 * 60 * 1000;
+
+  // Filtrar estados que tengan menos de 24 horas
+  allStatuses = allStatuses.filter(s => (now - s.time) < TWENTY_FOUR_HOURS);
+  localStorage.setItem("papuwhats_statuses", JSON.stringify(allStatuses));
+
+  if (allStatuses.length === 0) {
+    listEl.innerHTML = '<div class="empty-state">No hay estados recientes de tus amigos.</div>';
+    return;
+  }
+
+  listEl.innerHTML = allStatuses.map(s => {
+    const elapsedMinutes = Math.floor((now - s.time) / 60000);
+    const timeText = elapsedMinutes < 60 ? `Hace ${elapsedMinutes}m` : `Hace ${Math.floor(elapsedMinutes / 60)}h`;
+    const customAvatar = localStorage.getItem(`avatar_${s.user.toLowerCase()}`);
+    const avatarHtml = customAvatar 
+      ? `<img src="${customAvatar}" class="status-circle-ring">` 
+      : `<div class="status-circle-ring-letter">${s.user.charAt(0).toUpperCase()}</div>`;
+
+    return `
+      <div class="status-item" onclick="viewStatus('${s.user}', '${s.image}', '${timeText}')">
+        ${avatarHtml}
+        <div>
+          <div style="font-weight:600; font-size:14px;">${s.user}</div>
+          <div style="font-size:12px; color:var(--text-secondary);">${timeText}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+let statusTimer = null;
+function viewStatus(user, image, timeText) {
+  const modal = document.getElementById("modal-status-viewer");
+  document.getElementById("status-viewer-nick").textContent = user;
+  document.getElementById("status-viewer-time").textContent = timeText;
+  document.getElementById("status-viewer-img").src = image;
+
+  const avatarEl = document.getElementById("status-viewer-avatar");
+  const customAvatar = localStorage.getItem(`avatar_${user.toLowerCase()}`);
+  if (customAvatar) {
+    avatarEl.innerHTML = `<img src="${customAvatar}" class="avatar-circle-img">`;
+  } else {
+    avatarEl.textContent = user.charAt(0).toUpperCase();
+  }
+
+  const fill = document.getElementById("status-progress-fill");
+  fill.style.width = "0%";
+  modal.classList.remove("hidden");
+
+  setTimeout(() => { fill.style.width = "100%"; }, 50);
+
+  if (statusTimer) clearTimeout(statusTimer);
+  statusTimer = setTimeout(() => {
+    closeStatusViewer();
+  }, 5000);
+}
+
+function closeStatusViewer() {
+  document.getElementById("modal-status-viewer").classList.add("hidden");
+  if (statusTimer) clearTimeout(statusTimer);
+}
+
+/* Mensajes Destacados */
+function loadStarredMessages() {
+  const container = document.getElementById("starred-list");
+  let starredList = JSON.parse(localStorage.getItem("starred_messages") || "[]");
+
+  if (starredList.length === 0) {
+    container.innerHTML = '<div class="empty-state">No tienes mensajes destacados guardados.</div>';
+    return;
+  }
+
+  container.innerHTML = starredList.map(m => `
+    <div class="starred-item" onclick="openChatRoom('${m.partner}')">
+      <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+        <span style="font-weight:600; color:var(--accent-green); font-size:13px;">${m.partner}</span>
+        <span style="font-size:11px; color:var(--text-secondary);">${m.time || ''}</span>
+      </div>
+      <div style="font-size:13px; color:var(--text-primary);">${m.text}</div>
+    </div>
+  `).join("");
+}
+
+function switchAuthTab(tab) {
+  currentAuthTab = tab;
+  document.getElementById("tab-login").classList.toggle("active", tab === "login");
+  document.getElementById("tab-register").classList.toggle("active", tab === "register");
+  document.getElementById("btn-auth-text").textContent = tab === "login" ? "Iniciar Sesión" : "Registrarse";
+  document.getElementById("auth-error").classList.add("hidden");
+}
+
+let pendingTempToken = null;
+let currentNickAttempt = null;
+
+async function handleAuthSubmit(e) {
+  e.preventDefault();
+  const nick = document.getElementById("input-nick").value.trim();
+  const password = document.getElementById("input-password").value.trim();
+  const twofaCode = document.getElementById("input-2fa").value.trim();
+  const errorEl = document.getElementById("auth-error");
+
+  if (!nick || !password) return;
+
+  try {
+    errorEl.classList.add("hidden");
+
+    if (currentAuthTab === "login") {
+      if (pendingTempToken && twofaCode) {
+        await PapuApi.confirm2FA(pendingTempToken, twofaCode);
+        pendingTempToken = null;
+        localStorage.setItem("papuwhats_nick", currentNickAttempt);
+        showMainScreen(currentNickAttempt);
+        return;
+      }
+
+      const res = await PapuApi.login(nick, password);
+
+      if (res.twofaRequired) {
+        pendingTempToken = res.tempToken;
+        currentNickAttempt = nick;
+        document.getElementById("group-2fa").classList.remove("hidden");
+        document.getElementById("input-2fa").focus();
+        errorEl.textContent = "Tu cuenta requiere verificación 2FA. Ingresa tu código de 6 dígitos.";
+        errorEl.classList.remove("hidden");
+        return;
+      }
+
+      localStorage.setItem("papuwhats_nick", nick);
+      showMainScreen(nick);
+    } else {
+      await PapuApi.register(nick, password);
+      localStorage.setItem("papuwhats_nick", nick);
+      showMainScreen(nick);
+    }
+
+    if (window.AndroidNative && window.AndroidNative.vibratePhone) {
+      window.AndroidNative.vibratePhone();
+    }
+  } catch (err) {
+    errorEl.textContent = err.message;
+    errorEl.classList.remove("hidden");
+  }
+}
+
+function logout() {
+  PapuApi.clearToken();
+  localStorage.removeItem("papuwhats_nick");
+  showAuthScreen();
+}
+
+function filterChats() {
+  const query = document.getElementById("search-chats").value.toLowerCase();
+  const chatItems = document.querySelectorAll(".chat-item");
+
+  chatItems.forEach(item => {
+    const nick = item.querySelector(".chat-name").textContent.toLowerCase();
+    item.style.display = nick.includes(query) ? "flex" : "none";
+  });
+}

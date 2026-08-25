@@ -1,0 +1,338 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>papuWhats</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+  <!-- App Wrapper -->
+  <div id="app" class="app-container">
+
+    <!-- Pantalla 1: Auth (Login / Registro) -->
+    <section id="auth-screen" class="screen active">
+      <div class="auth-card">
+        <div class="brand-header">
+          <div class="brand-logo">
+            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>
+            </svg>
+          </div>
+          <h1>papuWhats</h1>
+          <p>Chat Privado - PapusBank</p>
+        </div>
+
+        <div class="auth-tabs">
+          <button id="tab-login" class="tab-btn active" onclick="switchAuthTab('login')">Ingresar</button>
+          <button id="tab-register" class="tab-btn" onclick="switchAuthTab('register')">Registrarse</button>
+        </div>
+
+        <form id="auth-form" onsubmit="handleAuthSubmit(event)">
+          <div class="input-group">
+            <label for="input-nick">Usuario / Nick</label>
+            <input type="text" id="input-nick" placeholder="Tu nick de PapusBank" required autocomplete="username">
+          </div>
+
+          <div class="input-group">
+            <label for="input-password">Contraseña</label>
+            <input type="password" id="input-password" placeholder="Tu contraseña" required autocomplete="current-password">
+          </div>
+
+          <div class="input-group id-2fa-group hidden" id="group-2fa">
+            <label for="input-2fa">Código de Verificación (2FA)</label>
+            <input type="text" id="input-2fa" placeholder="6 dígitos del autenticador" maxlength="6" autocomplete="one-time-code">
+          </div>
+
+          <div id="auth-error" class="error-msg hidden"></div>
+
+          <button type="submit" id="btn-auth-submit" class="primary-btn">
+            <span id="btn-auth-text">Iniciar Sesión</span>
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- Pantalla 2: Dashboard Principal (Chats / Estados / Amigos / Destacados) -->
+    <section id="main-screen" class="screen">
+      <header class="app-header">
+        <label class="user-profile-badge" title="Cambiar Foto de Perfil" style="cursor:pointer;">
+          <input type="file" id="input-my-avatar" accept="image/*" onchange="changeMyProfileAvatar(event)" style="display:none;">
+          <div class="avatar-circle" id="my-avatar">P</div>
+          <div class="user-meta">
+            <span id="my-nick" class="nick-text">Usuario</span>
+            <span id="my-status" class="status-online">Toca foto para cambiar</span>
+          </div>
+        </label>
+        <div class="header-actions">
+          <button class="icon-btn" onclick="showAddFriendModal()" title="Agregar Amigo">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="8.5" cy="7" r="4"></circle>
+              <line x1="20" y1="8" x2="20" y2="14"></line>
+              <line x1="17" y1="11" x2="23" y2="11"></line>
+            </svg>
+          </button>
+          <button class="icon-btn" onclick="logout()" title="Cerrar Sesión">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+              <polyline points="16 17 21 12 16 7"></polyline>
+              <line x1="21" y1="12" x2="9" y2="12"></line>
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <nav class="nav-tabs">
+        <button id="nav-chats" class="nav-btn active" onclick="switchNavTab('chats')">
+          Chats
+        </button>
+        <button id="nav-statuses" class="nav-btn" onclick="switchNavTab('statuses')">
+          Estados
+        </button>
+        <button id="nav-starred" class="nav-btn" onclick="switchNavTab('starred')">
+          ⭐ Destacados
+        </button>
+        <button id="nav-friends" class="nav-btn" onclick="switchNavTab('friends')">
+          Amigos <span id="badge-requests" class="badge hidden">0</span>
+        </button>
+      </nav>
+
+      <!-- Tab 1: Chats -->
+      <div id="tab-content-chats" class="tab-view active">
+        <div class="search-bar">
+          <input type="text" id="search-chats" placeholder="Buscar chat..." oninput="filterChats()">
+        </div>
+        <div id="chats-list" class="list-container"></div>
+      </div>
+
+      <!-- Tab 2: Estados / Historias (24 horas) -->
+      <div id="tab-content-statuses" class="tab-view">
+        <div class="status-my-card">
+          <label class="status-add-btn">
+            <input type="file" accept="image/*" onchange="uploadMyStatus(event)" style="display:none;">
+            <div class="avatar-circle status-add-avatar">➕</div>
+            <div>
+              <div style="font-weight:600; font-size:14px;">Mi Estado</div>
+              <div style="font-size:12px; color:var(--text-secondary);">Toca para subir una foto de 24h</div>
+            </div>
+          </label>
+        </div>
+        <div class="section-block" style="margin-top:14px;">
+          <h3>Estados de Amigos</h3>
+          <div id="statuses-list" class="list-container">
+            <div class="empty-state">No hay estados recientes de tus amigos.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 3: Mensajes Destacados -->
+      <div id="tab-content-starred" class="tab-view">
+        <div class="section-block">
+          <h3>Mensajes Guardados con Estrella ⭐</h3>
+          <div id="starred-list" class="list-container">
+            <div class="empty-state">No tienes mensajes destacados guardados.</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Tab 4: Amigos -->
+      <div id="tab-content-friends" class="tab-view">
+        <div class="section-block">
+          <h3>Solicitudes de Amistad</h3>
+          <div id="requests-list" class="list-container">
+            <div class="empty-state">No tienes solicitudes pendientes.</div>
+          </div>
+        </div>
+
+        <div class="section-block">
+          <h3>Lista de Amigos</h3>
+          <div id="friends-list" class="list-container">
+            <div class="empty-state">No has agregado amigos aún.</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Pantalla 3: Sala de Chat Directo 1 a 1 -->
+    <section id="chat-room" class="screen">
+      <header class="chat-header">
+        <button class="back-btn" onclick="closeChatRoom()">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+        </button>
+        <div class="chat-user-info">
+          <div class="avatar-circle" id="chat-target-avatar">A</div>
+          <div>
+            <div class="chat-target-nick" id="chat-target-nick">Amigo</div>
+            <div class="chat-target-sub" id="chat-target-sub">En línea</div>
+          </div>
+        </div>
+        <!-- Lupita: Buscador interno en el chat -->
+        <button class="icon-btn" onclick="toggleChatSearch()" title="Buscar mensajes">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
+      </header>
+
+      <!-- Barra de búsqueda interna dentro del chat -->
+      <div id="chat-search-bar" class="chat-search-container hidden">
+        <input type="text" id="chat-search-input" placeholder="Buscar palabra en esta conversación..." oninput="filterChatMessages()">
+        <button onclick="toggleChatSearch()">✕</button>
+      </div>
+
+      <!-- Mensajes Body -->
+      <div id="messages-container" class="messages-container"></div>
+
+      <!-- Barra de Grabación de Nota de Voz -->
+      <div id="recording-bar" class="recording-bar hidden">
+        <button type="button" class="recording-cancel-btn" onclick="cancelVoiceRecording()">🗑️ Cancelar</button>
+        <div class="recording-indicator">
+          <span class="rec-dot">●</span>
+          <span id="recording-timer">00:00</span>
+        </div>
+        <button type="button" class="send-btn" onclick="finishAndSendVoiceRecording()">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <line x1="22" y1="2" x2="11" y2="13"></line>
+            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Input de Mensaje Principal -->
+      <footer class="chat-footer">
+        <form id="chat-form" onsubmit="sendChatMessage(event)">
+          <button type="button" class="tool-btn" onclick="toggleEmojiPicker()" title="Logos y Stickers">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M8 14s1.5 2 4 2 4-2 4-2"></path>
+              <line x1="9" y1="9" x2="9.01" y2="9"></line>
+              <line x1="15" y1="9" x2="15.01" y2="9"></line>
+            </svg>
+          </button>
+
+          <!-- Botón 1: Galería Directa -->
+          <label class="tool-btn" title="Galería de Fotos">
+            <input type="file" id="file-gallery-input" accept="image/*" onchange="handleImageUpload(event)" style="display:none;">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+              <circle cx="8.5" cy="8.5" r="1.5"></circle>
+              <polyline points="21 15 16 10 5 21"></polyline>
+            </svg>
+          </label>
+
+          <!-- Botón 2: Cámara Nativa Directa -->
+          <button type="button" class="tool-btn" onclick="triggerNativeCamera()" title="Tomar Foto con Cámara">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path>
+              <circle cx="12" cy="13" r="4"></circle>
+            </svg>
+          </button>
+
+          <!-- Iniciar Grabación de Nota de Voz -->
+          <button type="button" class="tool-btn" onclick="startVoiceRecording()" title="Nota de Voz">
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+              <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              <line x1="12" y1="19" x2="12" y2="23"></line>
+              <line x1="8" y1="23" x2="16" y2="23"></line>
+            </svg>
+          </button>
+
+          <input type="text" id="chat-input" placeholder="Escribe un mensaje..." autocomplete="off">
+
+          <button type="submit" class="send-btn">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </form>
+
+        <!-- Panel de Emojis / Stickers con pestañas -->
+        <div id="emoji-picker" class="emoji-picker hidden">
+          <div class="picker-tabs">
+            <button id="picker-tab-emojis" class="picker-tab-btn active" onclick="switchPickerTab('emojis')">Emblemas</button>
+            <button id="picker-tab-stickers" class="picker-tab-btn" onclick="switchPickerTab('stickers')">Stickers</button>
+          </div>
+          <div id="picker-content" class="emoji-grid"></div>
+        </div>
+      </footer>
+    </section>
+
+    <!-- Modal: Editor de Imagen / Foto (Lápiz y Recorte) -->
+    <div id="modal-photo-editor" class="editor-overlay hidden">
+      <div class="editor-header">
+        <button class="icon-btn" onclick="cancelPhotoEdit()" title="Descartar">✕</button>
+        <div class="editor-tools">
+          <button id="tool-draw-btn" class="editor-tool-btn active" onclick="setEditorMode('draw')" title="Lápiz">✏️ Dibujar</button>
+          <input type="color" id="draw-color-picker" value="#00a884" title="Color" onchange="setDrawColor(this.value)">
+          <button id="tool-crop-btn" class="editor-tool-btn" onclick="setEditorMode('crop')" title="Recortar">✂️ Recortar</button>
+          <button class="editor-tool-btn" onclick="resetEditorCanvas()" title="Restablecer">↺</button>
+        </div>
+        <button class="primary-btn editor-send-btn" onclick="sendEditedPhoto()">Enviar ✓</button>
+      </div>
+      <div class="editor-canvas-container" id="canvas-container">
+        <canvas id="editor-canvas"></canvas>
+      </div>
+    </div>
+
+    <!-- Modal: Visor de Estados -->
+    <div id="modal-status-viewer" class="status-viewer-overlay hidden" onclick="closeStatusViewer()">
+      <div class="status-progress-bar"><div id="status-progress-fill" class="status-progress-fill"></div></div>
+      <div class="status-viewer-header">
+        <div class="avatar-circle" id="status-viewer-avatar">P</div>
+        <div>
+          <div id="status-viewer-nick" style="font-weight:600;">Usuario</div>
+          <div id="status-viewer-time" style="font-size:11px; opacity:0.8;">Hace un momento</div>
+        </div>
+      </div>
+      <img id="status-viewer-img" class="status-viewer-img" src="" alt="Estado">
+    </div>
+
+    <!-- Modal: Opciones del Mensaje (Destacar / Eliminar / Editar) -->
+    <div id="modal-msg-actions" class="modal-overlay hidden">
+      <div class="modal-card">
+        <h3>Opciones del Mensaje</h3>
+        <input type="text" id="edit-msg-input" placeholder="Editar texto...">
+        <div class="modal-actions" style="margin-top:14px; flex-wrap:wrap;">
+          <button class="secondary-btn" id="btn-star-msg" onclick="toggleStarSelectedMessage()">⭐ Destacar</button>
+          <button class="danger-btn" onclick="confirmDeleteMessage()">🗑️ Eliminar</button>
+          <button class="secondary-btn" onclick="hideMsgModal()">Cancelar</button>
+          <button class="primary-btn" onclick="confirmEditMessage()">💾 Guardar</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Modal: Agregar Amigo -->
+    <div id="modal-add-friend" class="modal-overlay hidden">
+      <div class="modal-card">
+        <h3>Enviar Solicitud de Amistad</h3>
+        <p>Ingresa el nick del usuario de PapusBank:</p>
+        <input type="text" id="input-friend-nick" placeholder="Nick exacto...">
+        <div id="modal-friend-error" class="error-msg hidden"></div>
+        <div class="modal-actions">
+          <button class="secondary-btn" onclick="hideAddFriendModal()">Cancelar</button>
+          <button class="primary-btn" onclick="sendFriendRequest()">Enviar Solicitud</button>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="js/api.js"></script>
+  <script src="js/emoji.js"></script>
+  <script src="js/friends.js"></script>
+  <script src="js/editor.js"></script>
+  <script src="js/chat.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

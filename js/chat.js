@@ -1,0 +1,598 @@
+let activeChatPartner = null;
+let chatPollingInterval = null;
+let seenMessageIds = new Set();
+let selectedMessageId = null;
+let selectedMessageData = null;
+let userIsScrolledUp = false;
+
+// Grabador de Voz WhatsApp Custom HD
+let voiceRecorderStream = null;
+let voiceMediaRecorder = null;
+let voiceAudioChunks = [];
+let voiceRecordingStartTime = 0;
+let voiceTimerInterval = null;
+let currentPlayingAudio = null;
+
+const PLAY_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
+const PAUSE_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
+
+function openChatRoom(targetNick) {
+  activeChatPartner = targetNick;
+  document.getElementById("chat-target-nick").textContent = targetNick;
+  
+  const targetAvatarEl = document.getElementById("chat-target-avatar");
+  const customAvatar = localStorage.getItem(`avatar_${targetNick.toLowerCase()}`);
+  if (customAvatar) {
+    targetAvatarEl.innerHTML = `<img src="${customAvatar}" class="avatar-circle-img">`;
+  } else {
+    targetAvatarEl.textContent = targetNick.charAt(0).toUpperCase();
+  }
+
+  document.getElementById("chat-room").classList.add("active");
+  const chatContainer = document.getElementById("messages-container");
+  chatContainer.innerHTML = "";
+  seenMessageIds.clear();
+  userIsScrolledUp = false;
+
+  chatContainer.onscroll = () => {
+    const threshold = 60;
+    const isAtBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight <= threshold;
+    userIsScrolledUp = !isAtBottom;
+  };
+
+  updateChatOnlineStatus(targetNick);
+  loadChatMessages(true);
+  if (chatPollingInterval) clearInterval(chatPollingInterval);
+  chatPollingInterval = setInterval(() => {
+    loadChatMessages(false);
+    updateChatOnlineStatus(targetNick);
+    const myNick = localStorage.getItem("papuwhats_nick");
+    if (myNick) PapuApi.sendHeartbeat(myNick);
+  }, 2000);
+}
+
+async function updateChatOnlineStatus(targetNick) {
+  const statusEl = document.getElementById("chat-target-sub");
+  if (!statusEl) return;
+  const isOnline = await PapuApi.checkUserOnline(targetNick);
+  if (isOnline) {
+    statusEl.textContent = "En línea";
+    statusEl.style.color = "#00a884";
+  } else {
+    statusEl.textContent = "Desconectado";
+    statusEl.style.color = "var(--text-secondary)";
+  }
+}
+
+function closeChatRoom() {
+  document.getElementById("chat-room").classList.remove("active");
+  activeChatPartner = null;
+  if (chatPollingInterval) clearInterval(chatPollingInterval);
+  if (currentPlayingAudio) {
+    currentPlayingAudio.pause();
+    currentPlayingAudio = null;
+  }
+  const searchBar = document.getElementById("chat-search-bar");
+  if (searchBar) searchBar.classList.add("hidden");
+  loadRecentChats();
+}
+
+function toggleChatSearch() {
+  const bar = document.getElementById("chat-search-bar");
+  bar.classList.toggle("hidden");
+  if (!bar.classList.contains("hidden")) {
+    document.getElementById("chat-search-input").focus();
+  } else {
+    document.getElementById("chat-search-input").value = "";
+    filterChatMessages();
+  }
+}
+
+function filterChatMessages() {
+  const query = (document.getElementById("chat-search-input").value || "").toLowerCase();
+  const bubbles = document.querySelectorAll("#messages-container .message-bubble");
+  bubbles.forEach(b => {
+    const text = b.textContent.toLowerCase();
+    b.style.display = (!query || text.includes(query)) ? "block" : "none";
+  });
+}
+
+async function loadChatMessages(forceScroll = false) {
+  if (!activeChatPartner) return;
+  const myNick = (localStorage.getItem("papuwhats_nick") || "").toLowerCase();
+
+  try {
+    const allMessages = await PapuApi.fetchPrivateMessages();
+    const chatContainer = document.getElementById("messages-container");
+
+    let deletedIds = JSON.parse(localStorage.getItem("deleted_msg_ids") || "[]");
+    let starredIds = JSON.parse(localStorage.getItem("starred_msg_ids") || "[]");
+
+    let privateMessages = allMessages.filter(msg => {
+      const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
+      const to = (msg.to || msg.toNick || msg.to_nick || "").toLowerCase();
+      const partner = activeChatPartner.toLowerCase();
+      const id = String(msg.id || msg._id || msg.createdAt);
+      if (deletedIds.includes(id)) return false;
+      return (from === myNick && to === partner) || (from === partner && to === myNick);
+    });
+
+    privateMessages.sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.created_at || a.timestamp || 0).getTime();
+      const timeB = new Date(b.createdAt || b.created_at || b.timestamp || 0).getTime();
+      return timeA - timeB;
+    });
+
+    privateMessages.forEach(msg => {
+      const msgId = String(msg.id || msg._id || msg.createdAt);
+      if (!seenMessageIds.has(msgId)) {
+        seenMessageIds.add(msgId);
+        const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
+        
+        if (from === activeChatPartner.toLowerCase() && from !== myNick && seenMessageIds.size > 1) {
+          if (window.AndroidNative && window.AndroidNative.showNotification) {
+            let notifText = msg.msg || msg.text || "";
+            if (notifText.startsWith("data:audio/")) {
+              notifText = "🎤 Nota de voz";
+            } else if (notifText.startsWith("data:image/")) {
+              notifText = "📷 Foto";
+            } else if (notifText.startsWith("STICKER:") || notifText.startsWith("data:sticker/") || msg.mediaType === "sticker") {
+              notifText = "🎨 Sticker";
+            }
+            window.AndroidNative.showNotification(activeChatPartner, notifText);
+          }
+        }
+      }
+    });
+
+    const isPartnerOnline = await PapuApi.checkUserOnline(activeChatPartner);
+
+    // Renderizar mensajes con Doble Check Azul y Estrella
+    chatContainer.innerHTML = privateMessages.map(msg => {
+      const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
+      const isOut = from === myNick;
+      const text = msg.msg || msg.text || "";
+      const mediaType = msg.mediaType || "";
+      const msgId = String(msg.id || msg._id || msg.createdAt || "");
+      const isStarred = starredIds.includes(msgId);
+
+      const timeStr = (msg.createdAt || msg.created_at || msg.timestamp) 
+        ? new Date(msg.createdAt || msg.created_at || msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
+        : "";
+
+      // Doble Check: Azul si está online, gris si se entregó
+      const checkColor = isPartnerOnline ? "#53bdeb" : "var(--text-secondary)";
+      const checkHtml = isOut 
+        ? `<span class="double-check" style="color:${checkColor}; margin-left:4px; font-size:11px; font-weight:700;">✓✓</span>` 
+        : "";
+
+      let contentHtml = "";
+      const isSticker = mediaType === "sticker" || text.startsWith("STICKER:") || text.startsWith("data:sticker/") || (text.startsWith("http") && text.includes("sticker"));
+      let stickerSrc = text;
+      if (text.startsWith("STICKER:")) stickerSrc = text.replace("STICKER:", "");
+
+      if (isSticker) {
+        contentHtml = `
+          <div class="sticker-msg-wrapper">
+            <img src="${stickerSrc}" class="msg-sticker" onclick="promptSaveSticker('${stickerSrc}')" title="Toca para guardar sticker">
+            <span class="sticker-save-hint">Toca para guardar</span>
+          </div>
+        `;
+      } else if (text.startsWith("data:image/") || (text.startsWith("http") && text.match(/\.(jpeg|jpg|gif|png|webp)$/i))) {
+        contentHtml = `<img src="${text}" class="msg-image" onclick="viewImage('${text}')">`;
+      } else if (text.startsWith("data:audio/")) {
+        contentHtml = `
+          <div class="custom-voice-player">
+            <button class="voice-play-btn" id="btn-play-${msgId}" onclick="playAudioBase64(this, '${msgId}')">${PLAY_SVG}</button>
+            <div class="voice-waveform">
+              <div class="voice-progress-bar" id="bar-${msgId}"></div>
+            </div>
+            <div class="voice-badge-logo">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
+              </svg>
+            </div>
+            <input type="hidden" id="audio-data-${msgId}" value="${text}">
+          </div>
+        `;
+      } else {
+        contentHtml = `<span>${escapeHtml(text)}</span>`;
+      }
+
+      return `
+        <div class="message-bubble ${isOut ? 'out' : 'in'} ${isSticker ? 'bubble-sticker' : ''}" data-id="${msgId}">
+          ${contentHtml}
+          <div class="msg-meta">
+            ${isStarred ? '<span style="color:#ffd700; font-size:10px; margin-right:4px;">⭐</span>' : ''}
+            <span class="msg-time">${timeStr}</span>
+            ${checkHtml}
+            <button class="msg-menu-btn" onclick="openMsgMenu(event, '${msgId}')">⋮</button>
+          </div>
+        </div>
+      `;
+    }).join("");
+
+    if (forceScroll || !userIsScrolledUp) {
+      chatContainer.scrollTop = chatContainer.scrollHeight;
+    }
+  } catch (err) {
+    console.error("Error al cargar chats:", err);
+  }
+}
+
+async function sendChatMessage(e) {
+  if (e) e.preventDefault();
+  const inputEl = document.getElementById("chat-input");
+  const text = inputEl.value.trim();
+  if (!text || !activeChatPartner) return;
+
+  inputEl.value = "";
+  try {
+    await PapuApi.sendPrivateMessage(activeChatPartner, text);
+    userIsScrolledUp = false;
+    await loadChatMessages(true);
+  } catch (err) {
+    alert("Error al enviar mensaje: " + err.message);
+  }
+}
+
+async function sendStickerMessage(stickerUrl) {
+  if (!activeChatPartner || !stickerUrl) return;
+  try {
+    const formattedSticker = stickerUrl.startsWith("http") ? `STICKER:${stickerUrl}` : stickerUrl;
+    await PapuApi.sendPrivateMessage(activeChatPartner, formattedSticker, "sticker");
+    userIsScrolledUp = false;
+    await loadChatMessages(true);
+  } catch (err) {
+    alert("Error al enviar sticker: " + err.message);
+  }
+}
+window.sendStickerMessage = sendStickerMessage;
+
+async function promptSaveSticker(stickerUrl) {
+  if (confirm("¿Deseas guardar este sticker en tus favoritos de papuWhats?")) {
+    if (window.saveStickerToDB) {
+      await window.saveStickerToDB(stickerUrl);
+      if (window.AndroidNative && window.AndroidNative.vibratePhone) {
+        window.AndroidNative.vibratePhone();
+      }
+      alert("¡Sticker guardado en tu colección!");
+    }
+  }
+}
+window.promptSaveSticker = promptSaveSticker;
+
+/* Envío de Fotos desde Galería (Pasa primero por el Editor) */
+function handleImageUpload(e) {
+  const file = e.target.files[0];
+  if (!file || !activeChatPartner) return;
+
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    const base64Data = event.target.result;
+    openPhotoEditor(base64Data);
+  };
+  reader.readAsDataURL(file);
+}
+
+/* Abrir Cámara Nativa / Web */
+function triggerNativeCamera() {
+  let camInput = document.getElementById("web-camera-input");
+  if (!camInput) {
+    camInput = document.createElement("input");
+    camInput.type = "file";
+    camInput.id = "web-camera-input";
+    camInput.accept = "image/*";
+    camInput.capture = "environment";
+    camInput.style.display = "none";
+    camInput.onchange = handleImageUpload;
+    document.body.appendChild(camInput);
+  }
+  camInput.click();
+}
+
+function onCameraPhotoCaptured(dataUrl) {
+  if (!activeChatPartner || !dataUrl) return;
+  openPhotoEditor(dataUrl);
+}
+
+async function sendEditedImageDirectly(dataUrl) {
+  if (!activeChatPartner || !dataUrl) return;
+  try {
+    await PapuApi.sendPrivateMessage(activeChatPartner, dataUrl, "image");
+    userIsScrolledUp = false;
+    await loadChatMessages(true);
+  } catch (err) {
+    alert("Error al enviar imagen: " + err.message);
+  }
+}
+window.sendEditedImageDirectly = sendEditedImageDirectly;
+
+/* Grabación de Audio HD */
+async function startVoiceRecording() {
+  const bar = document.getElementById("recording-bar");
+  const timer = document.getElementById("recording-timer");
+  const chatForm = document.getElementById("chat-form");
+
+  try {
+    voiceRecorderStream = await navigator.mediaDevices.getUserMedia({
+      audio: {
+        echoCancellation: true,
+        noiseSuppression: true,
+        autoGainControl: true,
+        sampleRate: 44100
+      }
+    });
+
+    let options = {};
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
+      options = { mimeType: 'audio/webm;codecs=opus', audioBitsPerSecond: 128000 };
+    } else if (MediaRecorder.isTypeSupported('audio/mp4')) {
+      options = { mimeType: 'audio/mp4', audioBitsPerSecond: 128000 };
+    }
+
+    voiceMediaRecorder = new MediaRecorder(voiceRecorderStream, options);
+    voiceAudioChunks = [];
+
+    voiceMediaRecorder.ondataavailable = e => {
+      if (e.data && e.data.size > 0) voiceAudioChunks.push(e.data);
+    };
+
+    voiceMediaRecorder.onstop = async () => {
+      if (voiceAudioChunks.length === 0) return;
+      const mime = voiceMediaRecorder.mimeType || 'audio/webm';
+      const audioBlob = new Blob(voiceAudioChunks, { type: mime });
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Audio = reader.result;
+        await PapuApi.sendPrivateMessage(activeChatPartner, base64Audio, "audio");
+        userIsScrolledUp = false;
+        await loadChatMessages(true);
+      };
+      reader.readAsDataURL(audioBlob);
+    };
+
+    voiceMediaRecorder.start(100);
+    voiceRecordingStartTime = Date.now();
+    chatForm.classList.add("hidden");
+    bar.classList.remove("hidden");
+
+    voiceTimerInterval = setInterval(() => {
+      const elapsed = Math.floor((Date.now() - voiceRecordingStartTime) / 1000);
+      const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
+      const secs = (elapsed % 60).toString().padStart(2, '0');
+      timer.textContent = `${mins}:${secs}`;
+    }, 1000);
+
+  } catch (err) {
+    alert("Permite el acceso al micrófono para enviar notas de voz.");
+  }
+}
+
+function cancelVoiceRecording() {
+  if (voiceMediaRecorder && voiceMediaRecorder.state !== "inactive") {
+    voiceAudioChunks = [];
+    voiceMediaRecorder.stop();
+    if (voiceRecorderStream) voiceRecorderStream.getTracks().forEach(t => t.stop());
+  }
+  stopVoiceUI();
+}
+
+function finishAndSendVoiceRecording() {
+  if (voiceMediaRecorder && voiceMediaRecorder.state !== "inactive") {
+    voiceMediaRecorder.stop();
+    if (voiceRecorderStream) voiceRecorderStream.getTracks().forEach(t => t.stop());
+  }
+  stopVoiceUI();
+}
+
+function stopVoiceUI() {
+  clearInterval(voiceTimerInterval);
+  document.getElementById("recording-bar").classList.add("hidden");
+  document.getElementById("chat-form").classList.remove("hidden");
+  document.getElementById("recording-timer").textContent = "00:00";
+}
+
+/* Reproductor de Audio HD */
+function playAudioBase64(btn, msgId) {
+  const dataEl = document.getElementById(`audio-data-${msgId}`);
+  const progressBar = document.getElementById(`bar-${msgId}`);
+  if (!dataEl) return;
+
+  const base64Src = dataEl.value;
+
+  if (currentPlayingAudio && currentPlayingAudio._msgId === msgId) {
+    if (currentPlayingAudio.paused) {
+      currentPlayingAudio.play();
+      btn.innerHTML = PAUSE_SVG;
+    } else {
+      currentPlayingAudio.pause();
+      btn.innerHTML = PLAY_SVG;
+    }
+    return;
+  }
+
+  if (currentPlayingAudio) {
+    currentPlayingAudio.pause();
+    const prevBtn = document.getElementById(`btn-play-${currentPlayingAudio._msgId}`);
+    if (prevBtn) prevBtn.innerHTML = PLAY_SVG;
+  }
+
+  const audio = new Audio(base64Src);
+  audio._msgId = msgId;
+  currentPlayingAudio = audio;
+
+  audio.ontimeupdate = () => {
+    if (audio.duration && progressBar) {
+      const pct = (audio.currentTime / audio.duration) * 100;
+      progressBar.style.width = `${pct}%`;
+    }
+  };
+
+  audio.onended = () => {
+    btn.innerHTML = PLAY_SVG;
+    if (progressBar) progressBar.style.width = "0%";
+    currentPlayingAudio = null;
+  };
+
+  audio.play().then(() => {
+    btn.innerHTML = PAUSE_SVG;
+  }).catch(err => {
+    console.error("Error reproduciendo audio:", err);
+    alert("No se pudo reproducir el audio en este dispositivo.");
+  });
+}
+
+/* Modales para Editar, Eliminar y Destacar Mensajes */
+function openMsgMenu(e, id) {
+  e.stopPropagation();
+  selectedMessageId = id;
+  const bubble = e.target.closest('.message-bubble');
+  const textSpan = bubble ? bubble.querySelector('span') : null;
+  const currentText = textSpan ? textSpan.textContent : '';
+
+  selectedMessageData = {
+    id: id,
+    text: currentText,
+    partner: activeChatPartner,
+    time: new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+  };
+
+  document.getElementById("edit-msg-input").value = currentText;
+  
+  let starredIds = JSON.parse(localStorage.getItem("starred_msg_ids") || "[]");
+  const isStarred = starredIds.includes(id);
+  document.getElementById("btn-star-msg").textContent = isStarred ? "⭐ Desmarcar" : "⭐ Destacar";
+
+  document.getElementById("modal-msg-actions").classList.remove("hidden");
+}
+
+function hideMsgModal() {
+  document.getElementById("modal-msg-actions").classList.add("hidden");
+  selectedMessageId = null;
+  selectedMessageData = null;
+}
+
+function toggleStarSelectedMessage() {
+  if (!selectedMessageId) return;
+  let starredList = JSON.parse(localStorage.getItem("starred_messages") || "[]");
+  let starredIds = JSON.parse(localStorage.getItem("starred_msg_ids") || "[]");
+
+  if (starredIds.includes(selectedMessageId)) {
+    starredList = starredList.filter(m => m.id !== selectedMessageId);
+    starredIds = starredIds.filter(i => i !== selectedMessageId);
+  } else {
+    starredList.unshift(selectedMessageData);
+    starredIds.unshift(selectedMessageId);
+  }
+
+  localStorage.setItem("starred_messages", JSON.stringify(starredList));
+  localStorage.setItem("starred_msg_ids", JSON.stringify(starredIds));
+  hideMsgModal();
+  loadChatMessages(false);
+}
+
+async function confirmEditMessage() {
+  if (!selectedMessageId) return;
+  const newText = document.getElementById("edit-msg-input").value.trim();
+  if (!newText) return;
+
+  try {
+    await PapuApi.editMessage(selectedMessageId, newText);
+    hideMsgModal();
+    await loadChatMessages();
+  } catch (err) {
+    alert("Error al editar mensaje: " + err.message);
+  }
+}
+
+async function confirmDeleteMessage() {
+  if (!selectedMessageId) return;
+
+  try {
+    // 1. Intentar borrar en la API
+    await PapuApi.deleteMessage(selectedMessageId);
+  } catch (err) {
+    console.warn("Borrado remoto no disponible, borrando localmente:", err);
+  }
+
+  // 2. Garantizar que desaparezca instantáneamente en la app
+  let deletedIds = JSON.parse(localStorage.getItem("deleted_msg_ids") || "[]");
+  deletedIds.push(selectedMessageId);
+  localStorage.setItem("deleted_msg_ids", JSON.stringify(deletedIds));
+
+  hideMsgModal();
+  await loadChatMessages();
+}
+
+function viewImage(url) {
+  window.open(url, '_blank');
+}
+
+async function loadRecentChats() {
+  const myNick = (localStorage.getItem("papuwhats_nick") || "").toLowerCase();
+  if (!myNick) return;
+
+  const allMessages = await PapuApi.fetchPrivateMessages();
+  const chatsMap = {};
+  let deletedIds = JSON.parse(localStorage.getItem("deleted_msg_ids") || "[]");
+
+  allMessages.forEach(msg => {
+    const msgId = String(msg.id || msg._id || msg.createdAt);
+    if (deletedIds.includes(msgId)) return;
+
+    const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
+    const to = (msg.to || msg.toNick || msg.to_nick || "").toLowerCase();
+    const time = msg.createdAt || msg.created_at || msg.timestamp;
+
+    if (from === myNick || to === myNick) {
+      const partner = from === myNick ? to : from;
+      if (!chatsMap[partner] || new Date(time) > new Date(chatsMap[partner].timestamp || chatsMap[partner].createdAt || chatsMap[partner].created_at)) {
+        chatsMap[partner] = msg;
+      }
+    }
+  });
+
+  const chatsList = document.getElementById("chats-list");
+  const partners = Object.keys(chatsMap);
+
+  if (partners.length === 0) {
+    chatsList.innerHTML = '<div class="empty-state">No tienes chats activos. Agrega un amigo para iniciar a chatear.</div>';
+    return;
+  }
+
+  chatsList.innerHTML = partners.map(partner => {
+    const msg = chatsMap[partner];
+    let text = msg.msg || msg.text || "";
+    if (text.startsWith("data:audio/")) text = "🎤 Nota de voz";
+    else if (text.startsWith("data:image/")) text = "📷 Foto";
+    else if (text.startsWith("STICKER:") || text.startsWith("data:sticker/") || msg.mediaType === "sticker") text = "🎨 Sticker";
+
+    const time = msg.createdAt || msg.created_at || msg.timestamp;
+    const timeStr = time ? new Date(time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
+    const customAvatar = localStorage.getItem(`avatar_${partner.toLowerCase()}`);
+    const avatarHtml = customAvatar 
+      ? `<img src="${customAvatar}" class="avatar-circle-img">`
+      : `<div class="avatar-circle">${partner.charAt(0).toUpperCase()}</div>`;
+
+    return `
+      <div class="chat-item" onclick="openChatRoom('${partner}')">
+        ${avatarHtml}
+        <div class="chat-info">
+          <div class="chat-name-row">
+            <span class="chat-name">${partner}</span>
+            <span class="chat-time">${timeStr}</span>
+          </div>
+          <div class="chat-last-msg">${escapeHtml(text)}</div>
+        </div>
+      </div>
+    `;
+  }).join("");
+}
+
+function escapeHtml(text) {
+  const div = document.createElement("div");
+  div.innerText = text;
+  return div.innerHTML;
+}
