@@ -21,6 +21,9 @@ function showAuthScreen() {
   document.getElementById("chat-room").classList.remove("active");
 }
 
+let globalKnownMsgIds = new Set();
+let isInitialMessageLoad = true;
+
 function showMainScreen(nick) {
   document.getElementById("auth-screen").classList.remove("active");
   document.getElementById("main-screen").classList.add("active");
@@ -39,13 +42,72 @@ function showMainScreen(nick) {
   loadRecentChats();
   loadSocialData();
 
-  // Polling periódico para recibir solicitudes de amistad, estados y chats nuevos
+  // Inicializar mensajes existentes para que NO notifique mensajes viejos
+  initGlobalMessageTracking();
+
+  // Polling periódico para recibir solicitudes de amistad, estados y notificar mensajes nuevos en segundo plano
   setInterval(() => {
     loadSocialData();
+    checkBackgroundNewMessages();
     if (document.getElementById("tab-content-chats").classList.contains("active")) {
       loadRecentChats();
     }
-  }, 4000);
+  }, 3000);
+}
+
+async function initGlobalMessageTracking() {
+  try {
+    const allMessages = await PapuApi.fetchPrivateMessages();
+    allMessages.forEach(m => {
+      globalKnownMsgIds.add(String(m.id || m._id || m.createdAt));
+    });
+    isInitialMessageLoad = false;
+  } catch (e) {}
+}
+
+async function checkBackgroundNewMessages() {
+  if (isInitialMessageLoad) return;
+  const myNick = (localStorage.getItem("papuwhats_nick") || "").toLowerCase();
+  if (!myNick) return;
+
+  try {
+    const allMessages = await PapuApi.fetchPrivateMessages();
+    let deletedIds = JSON.parse(localStorage.getItem("deleted_msg_ids") || "[]");
+
+    allMessages.forEach(msg => {
+      const msgId = String(msg.id || msg._id || msg.createdAt);
+      if (deletedIds.includes(msgId)) return;
+
+      if (!globalKnownMsgIds.has(msgId)) {
+        globalKnownMsgIds.add(msgId);
+
+        const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
+        const to = (msg.to || msg.toNick || msg.to_nick || "").toLowerCase();
+        const text = msg.msg || msg.text || "";
+
+        // Ignorar mis propios mensajes o eventos de reacción
+        if (from === myNick || text.startsWith("[REACT:")) return;
+
+        // Solo notificar si va dirigido a mí y NO tengo ese chat abierto con la app activa
+        const chatRoomActive = document.getElementById("chat-room").classList.contains("active");
+        const isCurrentActiveChat = chatRoomActive && window.activeChatPartner && window.activeChatPartner.toLowerCase() === from && !document.hidden;
+
+        if (to === myNick && !isCurrentActiveChat) {
+          let notifText = text;
+          if (notifText.startsWith("[QUOTE:")) {
+            const endQ = notifText.indexOf("]");
+            if (endQ !== -1) notifText = notifText.substring(endQ + 1).trim();
+          }
+          if (notifText.startsWith("data:audio/")) notifText = "Nota de voz";
+          else if (notifText.startsWith("data:image/")) notifText = "Foto";
+          else if (notifText.startsWith("STICKER:") || notifText.startsWith("data:sticker/") || msg.mediaType === "sticker") notifText = "Sticker";
+
+          const senderName = msg.from || msg.fromNick || msg.from_nick || "Amigo";
+          triggerAppNotification(senderName, notifText);
+        }
+      }
+    });
+  } catch (e) {}
 }
 
 // Emisor Universal de Notificaciones (PC / Android)

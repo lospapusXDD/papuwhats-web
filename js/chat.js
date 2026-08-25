@@ -20,6 +20,7 @@ const PAUSE_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="current
 
 function openChatRoom(targetNick) {
   activeChatPartner = targetNick;
+  window.activeChatPartner = targetNick;
   document.getElementById("chat-target-nick").textContent = targetNick;
   
   const targetAvatarEl = document.getElementById("chat-target-avatar");
@@ -243,24 +244,8 @@ async function loadChatMessages(forceScroll = false) {
 
     privateMessages.forEach(msg => {
       const msgId = String(msg.id || msg._id || msg.createdAt);
-      if (!seenMessageIds.has(msgId)) {
-        seenMessageIds.add(msgId);
-
-        const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
-        if (from === activeChatPartner.toLowerCase() && from !== myNick && seenMessageIds.size > 1) {
-          let notifText = msg.msg || msg.text || "";
-          if (notifText.startsWith("data:audio/")) {
-            notifText = "Nota de voz";
-          } else if (notifText.startsWith("data:image/")) {
-            notifText = "Foto";
-          } else if (notifText.startsWith("STICKER:") || notifText.startsWith("data:sticker/") || msg.mediaType === "sticker") {
-            notifText = "Sticker";
-          }
-          if (window.triggerAppNotification) {
-            window.triggerAppNotification(activeChatPartner, notifText);
-          }
-        }
-      }
+      seenMessageIds.add(msgId);
+      globalKnownMsgIds.add(msgId);
     });
 
     const isPartnerOnline = await PapuApi.checkUserOnline(activeChatPartner);
