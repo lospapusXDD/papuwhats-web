@@ -687,6 +687,10 @@ async function loadRecentChats() {
     const msgId = String(msg.id || msg._id || msg.createdAt);
     if (deletedIds.includes(msgId)) return;
 
+    // Ignorar eventos de reacción para que no salgan como último mensaje en la lista
+    const rawText = msg.msg || msg.text || "";
+    if (rawText.startsWith("[REACT:")) return;
+
     const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
     const to = (msg.to || msg.toNick || msg.to_nick || "").toLowerCase();
     const time = msg.createdAt || msg.created_at || msg.timestamp;
