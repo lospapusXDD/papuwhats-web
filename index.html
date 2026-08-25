@@ -174,6 +174,15 @@
             <div class="chat-target-sub" id="chat-target-sub">En línea</div>
           </div>
         </div>
+        <!-- Botón Fondo de Pantalla -->
+        <label class="icon-btn" title="Cambiar Fondo de Chat" style="cursor:pointer;">
+          <input type="file" accept="image/*" onchange="changeChatWallpaper(event)" style="display:none;">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+            <circle cx="8.5" cy="8.5" r="1.5"></circle>
+            <polyline points="21 15 16 10 5 21"></polyline>
+          </svg>
+        </label>
         <!-- Lupita: Buscador interno en el chat -->
         <button class="icon-btn" onclick="toggleChatSearch()" title="Buscar mensajes">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -191,6 +200,15 @@
 
       <!-- Mensajes Body -->
       <div id="messages-container" class="messages-container"></div>
+
+      <!-- Barra de Respuesta / Citar Mensaje -->
+      <div id="reply-preview-bar" class="reply-preview-bar hidden">
+        <div class="reply-preview-content">
+          <span id="reply-preview-user" class="reply-preview-user">Respondiendo a Usuario</span>
+          <span id="reply-preview-text" class="reply-preview-text">Texto del mensaje...</span>
+        </div>
+        <button type="button" class="reply-cancel-btn" onclick="cancelReplyQuote()">✕</button>
+      </div>
 
       <!-- Barra de Grabación de Nota de Voz -->
       <div id="recording-bar" class="recording-bar hidden">
@@ -298,12 +316,23 @@
       <img id="status-viewer-img" class="status-viewer-img" src="" alt="Estado">
     </div>
 
-    <!-- Modal: Opciones del Mensaje (Destacar / Eliminar / Editar) -->
+    <!-- Modal: Opciones del Mensaje (Reacciones / Responder / Destacar / Eliminar / Editar) -->
     <div id="modal-msg-actions" class="modal-overlay hidden">
       <div class="modal-card">
-        <h3>Opciones del Mensaje</h3>
+        <!-- Barra de Reacciones Rápidas -->
+        <div class="reactions-quick-bar">
+          <span class="reaction-emoji-btn" onclick="reactToMessage('❤️')">❤️</span>
+          <span class="reaction-emoji-btn" onclick="reactToMessage('😂')">😂</span>
+          <span class="reaction-emoji-btn" onclick="reactToMessage('😮')">😮</span>
+          <span class="reaction-emoji-btn" onclick="reactToMessage('😢')">😢</span>
+          <span class="reaction-emoji-btn" onclick="reactToMessage('🙏')">🙏</span>
+          <span class="reaction-emoji-btn" onclick="reactToMessage('🔥')">🔥</span>
+          <span class="reaction-emoji-btn" onclick="reactToMessage('👍')">👍</span>
+        </div>
+        <h3 style="margin-top:10px;">Opciones del Mensaje</h3>
         <input type="text" id="edit-msg-input" placeholder="Editar texto...">
-        <div class="modal-actions" style="margin-top:14px; flex-wrap:wrap;">
+        <div class="modal-actions" style="margin-top:14px; flex-wrap:wrap; gap:6px;">
+          <button class="primary-btn" style="flex:1;" onclick="startReplyToMessage()">↩️ Responder</button>
           <button class="secondary-btn" id="btn-star-msg" onclick="toggleStarSelectedMessage()">⭐ Destacar</button>
           <button class="danger-btn" onclick="confirmDeleteMessage()">🗑️ Eliminar</button>
           <button class="secondary-btn" onclick="hideMsgModal()">Cancelar</button>

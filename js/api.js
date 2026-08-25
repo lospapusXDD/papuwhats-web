@@ -74,7 +74,7 @@ const PapuApi = {
     return data;
   },
 
-  async sendHeartbeat(nick) {
+  async sendHeartbeat(nick, statusExtra = {}) {
     if (!nick) return;
     try {
       const profile = await this.getUserProfile(nick);
@@ -82,23 +82,35 @@ const PapuApi = {
       let extra = profile.secretAchievements || profile.secret_achievements || {};
       if (Array.isArray(extra)) extra = {};
       extra.last_seen = Date.now();
+      if (statusExtra.typing_to !== undefined) extra.typing_to = statusExtra.typing_to;
+      if (statusExtra.recording_to !== undefined) extra.recording_to = statusExtra.recording_to;
       await this.updateUser(nick, { secretAchievements: extra });
     } catch (e) {}
   },
 
-  async checkUserOnline(nick) {
-    if (!nick) return false;
+  async getUserStatusInfo(nick) {
+    if (!nick) return { online: false, typingTo: null, recordingTo: null };
     try {
       const profile = await this.getUserProfile(nick);
-      if (!profile) return false;
+      if (!profile) return { online: false, typingTo: null, recordingTo: null };
       const extra = profile.secretAchievements || profile.secret_achievements || {};
-      if (Array.isArray(extra)) return false;
+      if (Array.isArray(extra)) return { online: false, typingTo: null, recordingTo: null };
       const lastSeen = extra.last_seen || 0;
-      // Considerar "En línea" si estuvo activo en los últimos 20 segundos
-      return (Date.now() - lastSeen) < 25000;
+      const isOnline = (Date.now() - lastSeen) < 25000;
+      return {
+        online: isOnline,
+        typingTo: extra.typing_to || null,
+        recordingTo: extra.recording_to || null,
+        reactions: extra.reactions || {}
+      };
     } catch (e) {
-      return false;
+      return { online: false, typingTo: null, recordingTo: null };
     }
+  },
+
+  async checkUserOnline(nick) {
+    const info = await this.getUserStatusInfo(nick);
+    return info.online;
   },
 
   async getUserProfile(nick) {

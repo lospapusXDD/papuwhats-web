@@ -4,6 +4,7 @@ let seenMessageIds = new Set();
 let selectedMessageId = null;
 let selectedMessageData = null;
 let userIsScrolledUp = false;
+let currentQuotedMessage = null; // Mensaje citado/respondido
 
 // Grabador de Voz WhatsApp Custom HD
 let voiceRecorderStream = null;
@@ -12,6 +13,7 @@ let voiceAudioChunks = [];
 let voiceRecordingStartTime = 0;
 let voiceTimerInterval = null;
 let currentPlayingAudio = null;
+let currentAudioPlaybackRate = 1; // 1x, 1.5x, 2x
 
 const PLAY_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>`;
 const PAUSE_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>`;
@@ -28,16 +30,26 @@ function openChatRoom(targetNick) {
     targetAvatarEl.textContent = targetNick.charAt(0).toUpperCase();
   }
 
+  // Cargar fondo personalizado si existe
+  applyCustomChatWallpaper();
+
   document.getElementById("chat-room").classList.add("active");
   const chatContainer = document.getElementById("messages-container");
   chatContainer.innerHTML = "";
   seenMessageIds.clear();
   userIsScrolledUp = false;
+  cancelReplyQuote();
 
   chatContainer.onscroll = () => {
     const threshold = 60;
     const isAtBottom = chatContainer.scrollHeight - chatContainer.scrollTop - chatContainer.clientHeight <= threshold;
     userIsScrolledUp = !isAtBottom;
+  };
+
+  // Input typing listener
+  const chatInput = document.getElementById("chat-input");
+  chatInput.oninput = () => {
+    broadcastTyping(chatInput.value.length > 0);
   };
 
   updateChatOnlineStatus(targetNick);
@@ -46,16 +58,36 @@ function openChatRoom(targetNick) {
   chatPollingInterval = setInterval(() => {
     loadChatMessages(false);
     updateChatOnlineStatus(targetNick);
-    const myNick = localStorage.getItem("papuwhats_nick");
-    if (myNick) PapuApi.sendHeartbeat(myNick);
   }, 2000);
+}
+
+let typingTimeout = null;
+function broadcastTyping(isTyping) {
+  const myNick = localStorage.getItem("papuwhats_nick");
+  if (!myNick) return;
+
+  if (typingTimeout) clearTimeout(typingTimeout);
+  PapuApi.sendHeartbeat(myNick, { typing_to: isTyping ? activeChatPartner : null });
+
+  if (isTyping) {
+    typingTimeout = setTimeout(() => {
+      PapuApi.sendHeartbeat(myNick, { typing_to: null });
+    }, 4000);
+  }
 }
 
 async function updateChatOnlineStatus(targetNick) {
   const statusEl = document.getElementById("chat-target-sub");
   if (!statusEl) return;
-  const isOnline = await PapuApi.checkUserOnline(targetNick);
-  if (isOnline) {
+
+  const info = await PapuApi.getUserStatusInfo(targetNick);
+  const myNick = (localStorage.getItem("papuwhats_nick") || "").toLowerCase();
+
+  if (info.recordingTo && info.recordingTo.toLowerCase() === myNick) {
+    statusEl.innerHTML = `🎤 <span style="color:#25d366; font-weight:600;">grabando audio...</span>`;
+  } else if (info.typingTo && info.typingTo.toLowerCase() === myNick) {
+    statusEl.innerHTML = `✍️ <span style="color:#25d366; font-weight:600;">escribiendo...</span>`;
+  } else if (info.online) {
     statusEl.textContent = "En línea";
     statusEl.style.color = "#00a884";
   } else {
@@ -67,6 +99,7 @@ async function updateChatOnlineStatus(targetNick) {
 function closeChatRoom() {
   document.getElementById("chat-room").classList.remove("active");
   activeChatPartner = null;
+  cancelReplyQuote();
   if (chatPollingInterval) clearInterval(chatPollingInterval);
   if (currentPlayingAudio) {
     currentPlayingAudio.pause();
@@ -74,6 +107,7 @@ function closeChatRoom() {
   }
   const searchBar = document.getElementById("chat-search-bar");
   if (searchBar) searchBar.classList.add("hidden");
+  broadcastTyping(false);
   loadRecentChats();
 }
 
@@ -97,6 +131,65 @@ function filterChatMessages() {
   });
 }
 
+/* Fondos de Pantalla Personalizados */
+function changeChatWallpaper(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (event) => {
+    const bgUrl = event.target.result;
+    localStorage.setItem("papuwhats_chat_bg", bgUrl);
+    applyCustomChatWallpaper();
+    alert("¡Fondo de chat actualizado!");
+  };
+  reader.readAsDataURL(file);
+}
+
+function applyCustomChatWallpaper() {
+  const bg = localStorage.getItem("papuwhats_chat_bg");
+  const container = document.getElementById("messages-container");
+  if (bg && container) {
+    container.style.backgroundImage = `url("${bg}")`;
+    container.style.backgroundSize = "cover";
+    container.style.backgroundPosition = "center";
+  }
+}
+
+/* Responder / Citar Mensaje */
+function startReplyToMessage() {
+  if (!selectedMessageData) return;
+  currentQuotedMessage = {
+    id: selectedMessageData.id,
+    user: selectedMessageData.partner,
+    text: selectedMessageData.text
+  };
+
+  const replyBar = document.getElementById("reply-preview-bar");
+  document.getElementById("reply-preview-user").textContent = `Respondiendo a ${currentQuotedMessage.user}`;
+  document.getElementById("reply-preview-text").textContent = currentQuotedMessage.text;
+  replyBar.classList.remove("hidden");
+
+  hideMsgModal();
+  document.getElementById("chat-input").focus();
+}
+
+function cancelReplyQuote() {
+  currentQuotedMessage = null;
+  const replyBar = document.getElementById("reply-preview-bar");
+  if (replyBar) replyBar.classList.add("hidden");
+}
+
+/* Reaccionar a Mensaje con Emojis */
+function reactToMessage(emoji) {
+  if (!selectedMessageId) return;
+  let allReactions = JSON.parse(localStorage.getItem("papuwhats_msg_reactions") || "{}");
+  allReactions[selectedMessageId] = emoji;
+  localStorage.setItem("papuwhats_msg_reactions", JSON.stringify(allReactions));
+
+  hideMsgModal();
+  loadChatMessages(false);
+}
+
 async function loadChatMessages(forceScroll = false) {
   if (!activeChatPartner) return;
   const myNick = (localStorage.getItem("papuwhats_nick") || "").toLowerCase();
@@ -107,6 +200,7 @@ async function loadChatMessages(forceScroll = false) {
 
     let deletedIds = JSON.parse(localStorage.getItem("deleted_msg_ids") || "[]");
     let starredIds = JSON.parse(localStorage.getItem("starred_msg_ids") || "[]");
+    let reactionsMap = JSON.parse(localStorage.getItem("papuwhats_msg_reactions") || "{}");
 
     let privateMessages = allMessages.filter(msg => {
       const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
@@ -127,44 +221,47 @@ async function loadChatMessages(forceScroll = false) {
       const msgId = String(msg.id || msg._id || msg.createdAt);
       if (!seenMessageIds.has(msgId)) {
         seenMessageIds.add(msgId);
-        const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
-        
-        if (from === activeChatPartner.toLowerCase() && from !== myNick && seenMessageIds.size > 1) {
-          if (window.AndroidNative && window.AndroidNative.showNotification) {
-            let notifText = msg.msg || msg.text || "";
-            if (notifText.startsWith("data:audio/")) {
-              notifText = "🎤 Nota de voz";
-            } else if (notifText.startsWith("data:image/")) {
-              notifText = "📷 Foto";
-            } else if (notifText.startsWith("STICKER:") || notifText.startsWith("data:sticker/") || msg.mediaType === "sticker") {
-              notifText = "🎨 Sticker";
-            }
-            window.AndroidNative.showNotification(activeChatPartner, notifText);
-          }
-        }
       }
     });
 
     const isPartnerOnline = await PapuApi.checkUserOnline(activeChatPartner);
 
-    // Renderizar mensajes con Doble Check Azul y Estrella
+    // Renderizar mensajes con Doble Check, Respuestas, Reacciones y Velocidades
     chatContainer.innerHTML = privateMessages.map(msg => {
       const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
       const isOut = from === myNick;
-      const text = msg.msg || msg.text || "";
+      let text = msg.msg || msg.text || "";
       const mediaType = msg.mediaType || "";
       const msgId = String(msg.id || msg._id || msg.createdAt || "");
       const isStarred = starredIds.includes(msgId);
+      const reactionEmoji = reactionsMap[msgId] || "";
 
       const timeStr = (msg.createdAt || msg.created_at || msg.timestamp) 
         ? new Date(msg.createdAt || msg.created_at || msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
         : "";
 
-      // Doble Check: Azul si está online, gris si se entregó
       const checkColor = isPartnerOnline ? "#53bdeb" : "var(--text-secondary)";
       const checkHtml = isOut 
         ? `<span class="double-check" style="color:${checkColor}; margin-left:4px; font-size:11px; font-weight:700;">✓✓</span>` 
         : "";
+
+      // Parsear si el mensaje incluía respuesta citada: [QUOTE:user:texto]
+      let quoteHtml = "";
+      if (text.startsWith("[QUOTE:")) {
+        const endQuote = text.indexOf("]");
+        if (endQuote !== -1) {
+          const quoteRaw = text.substring(7, endQuote);
+          const [qUser, ...qTextArr] = quoteRaw.split(":");
+          const qText = qTextArr.join(":");
+          quoteHtml = `
+            <div class="message-quote-box">
+              <span class="quote-user">${escapeHtml(qUser)}</span>
+              <span class="quote-text">${escapeHtml(qText)}</span>
+            </div>
+          `;
+          text = text.substring(endQuote + 1).trim();
+        }
+      }
 
       let contentHtml = "";
       const isSticker = mediaType === "sticker" || text.startsWith("STICKER:") || text.startsWith("data:sticker/") || (text.startsWith("http") && text.includes("sticker"));
@@ -187,12 +284,7 @@ async function loadChatMessages(forceScroll = false) {
             <div class="voice-waveform">
               <div class="voice-progress-bar" id="bar-${msgId}"></div>
             </div>
-            <div class="voice-badge-logo">
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z"></path>
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2"></path>
-              </svg>
-            </div>
+            <button class="audio-speed-btn" onclick="toggleAudioSpeed(event, '${msgId}')" title="Cambiar velocidad">1x</button>
             <input type="hidden" id="audio-data-${msgId}" value="${text}">
           </div>
         `;
@@ -200,9 +292,13 @@ async function loadChatMessages(forceScroll = false) {
         contentHtml = `<span>${escapeHtml(text)}</span>`;
       }
 
+      const reactionBadgeHtml = reactionEmoji ? `<div class="msg-reaction-badge">${reactionEmoji}</div>` : "";
+
       return `
         <div class="message-bubble ${isOut ? 'out' : 'in'} ${isSticker ? 'bubble-sticker' : ''}" data-id="${msgId}">
+          ${quoteHtml}
           ${contentHtml}
+          ${reactionBadgeHtml}
           <div class="msg-meta">
             ${isStarred ? '<span style="color:#ffd700; font-size:10px; margin-right:4px;">⭐</span>' : ''}
             <span class="msg-time">${timeStr}</span>
@@ -224,10 +320,17 @@ async function loadChatMessages(forceScroll = false) {
 async function sendChatMessage(e) {
   if (e) e.preventDefault();
   const inputEl = document.getElementById("chat-input");
-  const text = inputEl.value.trim();
+  let text = inputEl.value.trim();
   if (!text || !activeChatPartner) return;
 
+  if (currentQuotedMessage) {
+    text = `[QUOTE:${currentQuotedMessage.user}:${currentQuotedMessage.text}] ${text}`;
+    cancelReplyQuote();
+  }
+
   inputEl.value = "";
+  broadcastTyping(false);
+
   try {
     await PapuApi.sendPrivateMessage(activeChatPartner, text);
     userIsScrolledUp = false;
@@ -276,20 +379,13 @@ function handleImageUpload(e) {
   reader.readAsDataURL(file);
 }
 
-/* Abrir Cámara Nativa / Web */
+/* Abrir Cámara Nativa Directa de Android */
 function triggerNativeCamera() {
-  let camInput = document.getElementById("web-camera-input");
-  if (!camInput) {
-    camInput = document.createElement("input");
-    camInput.type = "file";
-    camInput.id = "web-camera-input";
-    camInput.accept = "image/*";
-    camInput.capture = "environment";
-    camInput.style.display = "none";
-    camInput.onchange = handleImageUpload;
-    document.body.appendChild(camInput);
+  if (window.AndroidNative && window.AndroidNative.openCamera) {
+    window.AndroidNative.openCamera();
+  } else {
+    alert("Función de cámara no disponible en este dispositivo.");
   }
-  camInput.click();
 }
 
 function onCameraPhotoCaptured(dataUrl) {
@@ -358,6 +454,10 @@ async function startVoiceRecording() {
     chatForm.classList.add("hidden");
     bar.classList.remove("hidden");
 
+    // Transmitir que se está grabando audio
+    const myNick = localStorage.getItem("papuwhats_nick");
+    if (myNick) PapuApi.sendHeartbeat(myNick, { recording_to: activeChatPartner });
+
     voiceTimerInterval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - voiceRecordingStartTime) / 1000);
       const mins = Math.floor(elapsed / 60).toString().padStart(2, '0');
@@ -371,6 +471,9 @@ async function startVoiceRecording() {
 }
 
 function cancelVoiceRecording() {
+  const myNick = localStorage.getItem("papuwhats_nick");
+  if (myNick) PapuApi.sendHeartbeat(myNick, { recording_to: null });
+
   if (voiceMediaRecorder && voiceMediaRecorder.state !== "inactive") {
     voiceAudioChunks = [];
     voiceMediaRecorder.stop();
@@ -380,6 +483,9 @@ function cancelVoiceRecording() {
 }
 
 function finishAndSendVoiceRecording() {
+  const myNick = localStorage.getItem("papuwhats_nick");
+  if (myNick) PapuApi.sendHeartbeat(myNick, { recording_to: null });
+
   if (voiceMediaRecorder && voiceMediaRecorder.state !== "inactive") {
     voiceMediaRecorder.stop();
     if (voiceRecorderStream) voiceRecorderStream.getTracks().forEach(t => t.stop());
@@ -392,6 +498,20 @@ function stopVoiceUI() {
   document.getElementById("recording-bar").classList.add("hidden");
   document.getElementById("chat-form").classList.remove("hidden");
   document.getElementById("recording-timer").textContent = "00:00";
+}
+
+/* Cambiar velocidad de Audio (1x, 1.5x, 2x) */
+function toggleAudioSpeed(e, msgId) {
+  e.stopPropagation();
+  const btn = e.target;
+  const rates = [1, 1.5, 2];
+  let nextIdx = (rates.indexOf(currentAudioPlaybackRate) + 1) % rates.length;
+  currentAudioPlaybackRate = rates[nextIdx];
+  btn.textContent = `${currentAudioPlaybackRate}x`;
+
+  if (currentPlayingAudio && currentPlayingAudio._msgId === msgId) {
+    currentPlayingAudio.playbackRate = currentAudioPlaybackRate;
+  }
 }
 
 /* Reproductor de Audio HD */
@@ -421,6 +541,7 @@ function playAudioBase64(btn, msgId) {
 
   const audio = new Audio(base64Src);
   audio._msgId = msgId;
+  audio.playbackRate = currentAudioPlaybackRate;
   currentPlayingAudio = audio;
 
   audio.ontimeupdate = () => {
