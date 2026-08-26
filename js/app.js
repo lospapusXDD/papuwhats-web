@@ -541,10 +541,20 @@ async function handleAuthSubmit(e) {
       if (res.twofaRequired) {
         pendingTempToken = res.tempToken;
         currentNickAttempt = nick;
-        document.getElementById("group-2fa").classList.remove("hidden");
-        document.getElementById("input-2fa").focus();
-        errorEl.textContent = "Tu cuenta requiere verificación 2FA. Ingresa tu código de 6 dígitos.";
-        errorEl.classList.remove("hidden");
+        
+        window.onOtpVerifiedCallback = async (code) => {
+          try {
+            await PapuApi.confirm2FA(pendingTempToken, code);
+            pendingTempToken = null;
+            localStorage.setItem("papuwhats_nick", currentNickAttempt);
+            showMainScreen(currentNickAttempt);
+          } catch (err2fa) {
+            errorEl.textContent = "Código incorrecto: " + err2fa.message;
+            errorEl.classList.remove("hidden");
+          }
+        };
+
+        showOtpVerificationModal(nick, "4719");
         return;
       }
 

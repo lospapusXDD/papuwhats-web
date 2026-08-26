@@ -43,11 +43,6 @@
             <input type="password" id="input-password" placeholder="Tu contraseña" required autocomplete="current-password">
           </div>
 
-          <div class="input-group id-2fa-group hidden" id="group-2fa">
-            <label for="input-2fa">Código de Verificación (2FA)</label>
-            <input type="text" id="input-2fa" placeholder="6 dígitos del autenticador" maxlength="6" autocomplete="one-time-code">
-          </div>
-
           <div id="auth-error" class="error-msg hidden"></div>
 
           <button type="submit" id="btn-auth-submit" class="primary-btn">
@@ -56,6 +51,61 @@
         </form>
       </div>
     </section>
+
+    <!-- Pantalla Modal Futurista: Verificación OTP (Órbita de Partículas + SMS Toast) -->
+    <div id="modal-otp-screen" class="otp-modal-screen hidden">
+      <!-- Canvas transparente donde vuelan y orbitan las partículas / números -->
+      <canvas id="otp-particle-canvas" class="otp-particle-canvas"></canvas>
+
+      <div class="otp-card" id="otp-card">
+        <div class="otp-badge-icon">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+          </svg>
+        </div>
+        <h2 class="otp-title">Verify your number</h2>
+        <p class="otp-subtitle">Enter the 4-digit code sent to <span id="otp-target-user" class="otp-highlight">@usuario</span></p>
+
+        <!-- 4 Casillas de OTP -->
+        <div class="otp-slots-container" id="otp-slots-container">
+          <div class="otp-slot" data-slot="0" id="otp-slot-0"></div>
+          <div class="otp-slot" data-slot="1" id="otp-slot-1"></div>
+          <div class="otp-slot" data-slot="2" id="otp-slot-2"></div>
+          <div class="otp-slot" data-slot="3" id="otp-slot-3"></div>
+          <!-- Input oculto para recibir teclado en móvil / PC -->
+          <input type="text" id="otp-hidden-input" maxlength="4" inputmode="numeric" pattern="[0-9]*" class="otp-hidden-input" autocomplete="one-time-code">
+        </div>
+
+        <div class="otp-resend-timer">
+          Didn't receive the code? <span id="otp-timer-text" class="otp-timer-highlight">Resend in 25s</span>
+        </div>
+
+        <button type="button" class="otp-verify-btn" id="btn-otp-verify" onclick="confirmOtpManual()">
+          Verify & Continue
+        </button>
+
+        <button type="button" class="otp-cancel-btn" onclick="closeOtpScreen()">
+          Cancel
+        </button>
+      </div>
+
+      <!-- SMS Notification / Toast inferior con botón FILL -->
+      <div id="sms-toast" class="sms-toast hidden">
+        <div class="sms-icon-bubble">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+          </svg>
+        </div>
+        <div class="sms-toast-content">
+          <div class="sms-app-name">MESSAGES · NOW</div>
+          <div class="sms-text" id="sms-code-preview">OTP: 4719 is your verification code</div>
+        </div>
+        <button type="button" class="sms-fill-btn" id="btn-sms-fill" onclick="triggerOtpOrbitAnimation()">
+          FILL
+        </button>
+      </div>
+    </div>
 
     <!-- Pantalla 2: Dashboard Principal (Chats / Estados / Amigos / Destacados) -->
     <section id="main-screen" class="screen">
@@ -426,6 +476,7 @@
   </div>
 
   <script src="js/api.js"></script>
+  <script src="js/otp.js"></script>
   <script src="js/emoji.js"></script>
   <script src="js/friends.js"></script>
   <script src="js/editor.js"></script>
