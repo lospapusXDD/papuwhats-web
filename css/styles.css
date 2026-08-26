@@ -552,6 +552,10 @@ body, html {
   box-shadow: 0 4px 14px rgba(0, 0, 0, 0.35);
   transform: translateZ(0);
   will-change: transform, opacity;
+}
+
+/* Solo los mensajes NUEVOS hacen la animación burbuja */
+.message-bubble.bubble-new {
   animation: bubblePopIn 0.32s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
 }
 

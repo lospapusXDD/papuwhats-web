@@ -204,6 +204,90 @@ async function reactToMessage(emoji) {
   loadChatMessages(false);
 }
 
+/* Genera el HTML de una sola burbuja de mensaje */
+function renderMsgBubble(msg, isPartnerOnline, starredIds, reactionsMap, isNew) {
+  const myNick = (localStorage.getItem("papuwhats_nick") || "").toLowerCase();
+  const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
+  const isOut = from === myNick;
+  let text = msg.msg || msg.text || "";
+  const mediaType = msg.mediaType || "";
+  const msgId = String(msg.id || msg._id || msg.createdAt || "");
+  const isStarred = starredIds.includes(msgId);
+  const reactionEmoji = reactionsMap[msgId] || "";
+
+  const timeStr = (msg.createdAt || msg.created_at || msg.timestamp)
+    ? new Date(msg.createdAt || msg.created_at || msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})
+    : "";
+
+  const checkColor = isPartnerOnline ? "#53bdeb" : "var(--text-secondary)";
+  const checkHtml = isOut
+    ? `<span class="double-check" style="color:${checkColor}; margin-left:4px; font-size:11px; font-weight:700;">✓✓</span>`
+    : "";
+
+  let quoteHtml = "";
+  if (text.startsWith("[QUOTE:")) {
+    const endQuote = text.indexOf("]");
+    if (endQuote !== -1) {
+      const quoteRaw = text.substring(7, endQuote);
+      const [qUser, ...qTextArr] = quoteRaw.split(":");
+      const qText = qTextArr.join(":");
+      quoteHtml = `
+        <div class="message-quote-box">
+          <span class="quote-user">${escapeHtml(qUser)}</span>
+          <span class="quote-text">${escapeHtml(qText)}</span>
+        </div>
+      `;
+      text = text.substring(endQuote + 1).trim();
+    }
+  }
+
+  let contentHtml = "";
+  const isSticker = mediaType === "sticker" || text.startsWith("STICKER:") || text.startsWith("data:sticker/") || (text.startsWith("http") && text.includes("sticker"));
+  let stickerSrc = text;
+  if (text.startsWith("STICKER:")) stickerSrc = text.replace("STICKER:", "");
+
+  if (isSticker) {
+    contentHtml = `
+      <div class="sticker-msg-wrapper">
+        <img src="${stickerSrc}" class="msg-sticker" onclick="promptSaveSticker('${stickerSrc}')" title="Toca para guardar sticker">
+        <span class="sticker-save-hint">Toca para guardar</span>
+      </div>
+    `;
+  } else if (text.startsWith("data:image/") || (text.startsWith("http") && text.match(/\.(jpeg|jpg|gif|png|webp)$/i))) {
+    contentHtml = `<img src="${text}" class="msg-image" onclick="viewImage('${text}')">`;
+  } else if (text.startsWith("data:audio/")) {
+    contentHtml = `
+      <div class="custom-voice-player">
+        <button class="voice-play-btn" id="btn-play-${msgId}" onclick="playAudioBase64(this, '${msgId}')">${PLAY_SVG}</button>
+        <div class="voice-waveform">
+          <div class="voice-progress-bar" id="bar-${msgId}"></div>
+        </div>
+        <button class="audio-speed-btn" onclick="toggleAudioSpeed(event, '${msgId}')" title="Cambiar velocidad">1x</button>
+        <input type="hidden" id="audio-data-${msgId}" value="${text}">
+      </div>
+    `;
+  } else {
+    contentHtml = `<span>${escapeHtml(text)}</span>`;
+  }
+
+  const reactionBadgeHtml = reactionEmoji ? `<div class="msg-reaction-badge">${reactionEmoji}</div>` : "";
+  const newClass = isNew ? ' bubble-new' : '';
+
+  return `
+    <div class="message-bubble ${isOut ? 'out' : 'in'} ${isSticker ? 'bubble-sticker' : ''}${newClass}" data-id="${msgId}">
+      ${quoteHtml}
+      ${contentHtml}
+      ${reactionBadgeHtml}
+      <div class="msg-meta">
+        ${isStarred ? '<span style="color:#ffd700; font-size:10px; margin-right:4px;">⭐</span>' : ''}
+        <span class="msg-time">${timeStr}</span>
+        ${checkHtml}
+        <button class="msg-menu-btn" onclick="openMsgMenu(event, '${msgId}')">⋮</button>
+      </div>
+    </div>
+  `;
+}
+
 async function loadChatMessages(forceScroll = false) {
   if (!activeChatPartner) return;
   const myNick = (localStorage.getItem("papuwhats_nick") || "").toLowerCase();
@@ -250,88 +334,47 @@ async function loadChatMessages(forceScroll = false) {
 
     const isPartnerOnline = await PapuApi.checkUserOnline(activeChatPartner);
 
-    // Renderizar mensajes con Doble Check, Respuestas, Reacciones y Velocidades
-    chatContainer.innerHTML = privateMessages.map(msg => {
-      const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
-      const isOut = from === myNick;
-      let text = msg.msg || msg.text || "";
-      const mediaType = msg.mediaType || "";
-      const msgId = String(msg.id || msg._id || msg.createdAt || "");
-      const isStarred = starredIds.includes(msgId);
-      const reactionEmoji = reactionsMap[msgId] || "";
+    // Construir set de IDs actuales en el DOM
+    const existingBubbles = chatContainer.querySelectorAll('.message-bubble[data-id]');
+    const existingIds = new Set();
+    existingBubbles.forEach(b => existingIds.add(b.getAttribute('data-id')));
 
-      const timeStr = (msg.createdAt || msg.created_at || msg.timestamp) 
-        ? new Date(msg.createdAt || msg.created_at || msg.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) 
-        : "";
+    // Construir set de IDs que deberían existir
+    const newMsgIds = new Set(privateMessages.map(msg => String(msg.id || msg._id || msg.createdAt || "")));
 
-      const checkColor = isPartnerOnline ? "#53bdeb" : "var(--text-secondary)";
-      const checkHtml = isOut 
-        ? `<span class="double-check" style="color:${checkColor}; margin-left:4px; font-size:11px; font-weight:700;">✓✓</span>` 
-        : "";
+    // Si la cantidad de mensajes cambió drásticamente (borrado, primer load), hacer full render
+    const needsFullRender = forceScroll && existingIds.size === 0;
 
-      // Parsear si el mensaje incluía respuesta citada: [QUOTE:user:texto]
-      let quoteHtml = "";
-      if (text.startsWith("[QUOTE:")) {
-        const endQuote = text.indexOf("]");
-        if (endQuote !== -1) {
-          const quoteRaw = text.substring(7, endQuote);
-          const [qUser, ...qTextArr] = quoteRaw.split(":");
-          const qText = qTextArr.join(":");
-          quoteHtml = `
-            <div class="message-quote-box">
-              <span class="quote-user">${escapeHtml(qUser)}</span>
-              <span class="quote-text">${escapeHtml(qText)}</span>
-            </div>
-          `;
-          text = text.substring(endQuote + 1).trim();
+    if (needsFullRender) {
+      // Render completo solo la primera vez o al abrir el chat
+      chatContainer.innerHTML = privateMessages.map(msg => renderMsgBubble(msg, isPartnerOnline, starredIds, reactionsMap, true)).join("");
+    } else {
+      // Eliminar burbujas de mensajes borrados
+      existingBubbles.forEach(b => {
+        if (!newMsgIds.has(b.getAttribute('data-id'))) b.remove();
+      });
+
+      // Actualizar checks de mensajes existentes (online/offline)
+      existingBubbles.forEach(b => {
+        const checkEl = b.querySelector('.double-check');
+        if (checkEl) {
+          checkEl.style.color = isPartnerOnline ? '#53bdeb' : 'var(--text-secondary)';
         }
-      }
+      });
 
-      let contentHtml = "";
-      const isSticker = mediaType === "sticker" || text.startsWith("STICKER:") || text.startsWith("data:sticker/") || (text.startsWith("http") && text.includes("sticker"));
-      let stickerSrc = text;
-      if (text.startsWith("STICKER:")) stickerSrc = text.replace("STICKER:", "");
-
-      if (isSticker) {
-        contentHtml = `
-          <div class="sticker-msg-wrapper">
-            <img src="${stickerSrc}" class="msg-sticker" onclick="promptSaveSticker('${stickerSrc}')" title="Toca para guardar sticker">
-            <span class="sticker-save-hint">Toca para guardar</span>
-          </div>
-        `;
-      } else if (text.startsWith("data:image/") || (text.startsWith("http") && text.match(/\.(jpeg|jpg|gif|png|webp)$/i))) {
-        contentHtml = `<img src="${text}" class="msg-image" onclick="viewImage('${text}')">`;
-      } else if (text.startsWith("data:audio/")) {
-        contentHtml = `
-          <div class="custom-voice-player">
-            <button class="voice-play-btn" id="btn-play-${msgId}" onclick="playAudioBase64(this, '${msgId}')">${PLAY_SVG}</button>
-            <div class="voice-waveform">
-              <div class="voice-progress-bar" id="bar-${msgId}"></div>
-            </div>
-            <button class="audio-speed-btn" onclick="toggleAudioSpeed(event, '${msgId}')" title="Cambiar velocidad">1x</button>
-            <input type="hidden" id="audio-data-${msgId}" value="${text}">
-          </div>
-        `;
-      } else {
-        contentHtml = `<span>${escapeHtml(text)}</span>`;
-      }
-
-      const reactionBadgeHtml = reactionEmoji ? `<div class="msg-reaction-badge">${reactionEmoji}</div>` : "";
-
-      return `
-        <div class="message-bubble ${isOut ? 'out' : 'in'} ${isSticker ? 'bubble-sticker' : ''}" data-id="${msgId}">
-          ${quoteHtml}
-          ${contentHtml}
-          ${reactionBadgeHtml}
-          <div class="msg-meta">
-            ${isStarred ? '<span style="color:#ffd700; font-size:10px; margin-right:4px;">⭐</span>' : ''}
-            <span class="msg-time">${timeStr}</span>
-            ${checkHtml}
-            <button class="msg-menu-btn" onclick="openMsgMenu(event, '${msgId}')">⋮</button>
-          </div>
-        </div>
-      `;
-    }).join("");
+      // Solo agregar mensajes que NO existen en el DOM
+      privateMessages.forEach(msg => {
+        const msgId = String(msg.id || msg._id || msg.createdAt || "");
+        if (!existingIds.has(msgId)) {
+          const tempDiv = document.createElement('div');
+          tempDiv.innerHTML = renderMsgBubble(msg, isPartnerOnline, starredIds, reactionsMap, true);
+          const newBubble = tempDiv.firstElementChild;
+          chatContainer.appendChild(newBubble);
+          // Auto-remover clase de animación cuando termine
+          newBubble.addEventListener('animationend', () => newBubble.classList.remove('bubble-new'), { once: true });
+        }
+      });
+    }
 
     if (forceScroll || !userIsScrolledUp) {
       chatContainer.scrollTop = chatContainer.scrollHeight;
