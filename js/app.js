@@ -519,7 +519,6 @@ async function handleAuthSubmit(e) {
   e.preventDefault();
   const nick = document.getElementById("input-nick").value.trim();
   const password = document.getElementById("input-password").value.trim();
-  const twofaCode = document.getElementById("input-2fa").value.trim();
   const errorEl = document.getElementById("auth-error");
 
   if (!nick || !password) return;
@@ -528,17 +527,9 @@ async function handleAuthSubmit(e) {
     errorEl.classList.add("hidden");
 
     if (currentAuthTab === "login") {
-      if (pendingTempToken && twofaCode) {
-        await PapuApi.confirm2FA(pendingTempToken, twofaCode);
-        pendingTempToken = null;
-        localStorage.setItem("papuwhats_nick", currentNickAttempt);
-        showMainScreen(currentNickAttempt);
-        return;
-      }
-
       const res = await PapuApi.login(nick, password);
 
-      if (res.twofaRequired) {
+      if (res && res.twofaRequired) {
         pendingTempToken = res.tempToken;
         currentNickAttempt = nick;
         
@@ -549,11 +540,16 @@ async function handleAuthSubmit(e) {
             localStorage.setItem("papuwhats_nick", currentNickAttempt);
             showMainScreen(currentNickAttempt);
           } catch (err2fa) {
-            errorEl.textContent = "Código incorrecto: " + err2fa.message;
+            errorEl.textContent = "Código 2FA incorrecto: " + err2fa.message;
             errorEl.classList.remove("hidden");
+            // Reabrir modal en caso de fallo
+            setTimeout(() => {
+              showOtpVerificationModal(nick, "1234");
+            }, 600);
           }
         };
 
+        // Mostrar la animación y modal OTP de 4 dígitos
         showOtpVerificationModal(nick, "4719");
         return;
       }
@@ -570,7 +566,7 @@ async function handleAuthSubmit(e) {
       window.AndroidNative.vibratePhone();
     }
   } catch (err) {
-    errorEl.textContent = err.message;
+    errorEl.textContent = err.message || "Error al iniciar sesión";
     errorEl.classList.remove("hidden");
   }
 }
