@@ -317,6 +317,14 @@ async function loadChatMessages(forceScroll = false) {
         return false;
       }
 
+      const isAiChat = partner.includes("papucore-ai") || partner.includes("ai");
+      const fromIsAi = from.includes("papucore-ai") || from.includes("ai");
+      const toIsAi = to.includes("papucore-ai") || to.includes("ai");
+
+      if (isAiChat) {
+        return (from === myNick && toIsAi) || (fromIsAi && to === myNick);
+      }
+
       return (from === myNick && to === partner) || (from === partner && to === myNick);
     });
 
