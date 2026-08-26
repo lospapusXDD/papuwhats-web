@@ -282,17 +282,17 @@ body, html {
   max-width: 440px;
   height: 64px;
   padding: 0 8px;
-  background: rgba(13, 17, 23, 0.78);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
+  background: rgba(13, 17, 23, 0.92);
   border-radius: 999px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.55), inset 0 1px 1px rgba(255, 255, 255, 0.1);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.5);
   pointer-events: all;
   overflow: visible;
+  transform: translateZ(0);
+  will-change: transform;
 }
 
-/* ── SVG Light Rod & Glow Ring (Motor gráfico de Arc) ── */
+/* ── SVG Light Rod & Glow Ring (Aceleración por GPU) ── */
 .arc-light-svg {
   position: absolute;
   top: 0;
@@ -302,12 +302,14 @@ body, html {
   pointer-events: none;
   z-index: 1;
   overflow: visible;
+  transform: translateZ(0);
+  will-change: d;
 }
 
 .arc-light-halo {
   fill: none;
-  stroke: rgba(255, 200, 80, 0.55);
-  stroke-width: 8;
+  stroke: rgba(255, 200, 80, 0.35);
+  stroke-width: 6;
   stroke-linecap: round;
 }
 
@@ -316,7 +318,6 @@ body, html {
   stroke: #ffda79;
   stroke-width: 2.2;
   stroke-linecap: round;
-  filter: drop-shadow(0 0 5px rgba(255, 218, 121, 0.9));
 }
 
 /* ── Capsule Items ── */
