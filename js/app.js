@@ -188,22 +188,34 @@ function changeMyProfileAvatar(e) {
   reader.readAsDataURL(file);
 }
 
-// ─── Capsule Nav: Spring-Physics Glow Ring ───
-let capsuleSpring = { x: 0, velocity: 0, target: 0, running: false };
-const SPRING_DAMPING = 22;
-const SPRING_STIFFNESS = 235;
+// ─── Capsule Nav: Spring-Physics Glow Ring with Stretch Deformation ───
+// Spring constants matching Jetpack Compose:
+//   Spring.StiffnessLow = 200
+//   Spring.DampingRatioMediumBouncy = 0.5
+//   damping = 2 * dampingRatio * sqrt(stiffness) = 2 * 0.5 * √200 ≈ 14.14
+const SPRING_STIFFNESS = 200;
+const SPRING_DAMPING_RATIO = 0.5;
+const SPRING_DAMPING = 2 * SPRING_DAMPING_RATIO * Math.sqrt(SPRING_STIFFNESS); // ~14.14
+
+let capsuleSpring = {
+  x: 0,
+  velocity: 0,
+  target: 0,
+  running: false,
+  lastTime: 0,
+};
 
 function initCapsuleNav() {
   const items = document.querySelectorAll('.capsule-item');
   if (!items.length) return;
-  // Posicionar el ring sobre el primer ítem activo
   requestAnimationFrame(() => {
     const activeItem = document.querySelector('.capsule-item.active');
     if (activeItem) {
       const pos = getCapsuleItemCenter(activeItem);
       capsuleSpring.x = pos;
       capsuleSpring.target = pos;
-      moveGlowRing(pos);
+      capsuleSpring.velocity = 0;
+      updateGlowRing(pos, 0);
     }
   });
 }
@@ -216,27 +228,47 @@ function getCapsuleItemCenter(el) {
   return (elRect.left + elRect.width / 2) - trackRect.left;
 }
 
-function moveGlowRing(xPx) {
+function updateGlowRing(xPx, velocity) {
   const ring = document.getElementById('capsule-glow-ring');
-  if (ring) ring.style.left = xPx + 'px';
+  if (!ring) return;
+
+  // Stretch deformation based on velocity
+  const speed = Math.abs(velocity);
+  const maxStretch = 0.45;
+  const stretchFactor = Math.min(speed / 600, maxStretch);
+  const scaleX = 1 + stretchFactor;
+  const scaleY = 1 / Math.sqrt(scaleX); // compress vertically to keep area ~constant
+
+  ring.style.transform = `translate(-50%, -50%) scaleX(${scaleX.toFixed(3)}) scaleY(${scaleY.toFixed(3)})`;
+  ring.style.left = xPx + 'px';
 }
 
-function animateCapsuleSpring() {
+function animateCapsuleSpring(timestamp) {
   if (!capsuleSpring.running) return;
 
-  const dx = capsuleSpring.x - capsuleSpring.target;
-  const ax = (-SPRING_STIFFNESS * dx) - (SPRING_DAMPING * capsuleSpring.velocity);
-  capsuleSpring.velocity += ax * (1 / 60);
-  capsuleSpring.x += capsuleSpring.velocity * (1 / 60);
+  // Calculate real delta time (capped at 32ms to avoid spiral on tab-switch)
+  if (!capsuleSpring.lastTime) capsuleSpring.lastTime = timestamp;
+  const rawDt = (timestamp - capsuleSpring.lastTime) / 1000;
+  const dt = Math.min(rawDt, 0.032);
+  capsuleSpring.lastTime = timestamp;
 
-  moveGlowRing(capsuleSpring.x);
+  // Spring physics: F = -k*x - c*v
+  const displacement = capsuleSpring.x - capsuleSpring.target;
+  const springForce = -SPRING_STIFFNESS * displacement;
+  const dampingForce = -SPRING_DAMPING * capsuleSpring.velocity;
+  const acceleration = springForce + dampingForce;
 
-  // Frenar cuando ya está cerca del destino
-  if (Math.abs(capsuleSpring.velocity) < 0.1 && Math.abs(dx) < 0.2) {
+  capsuleSpring.velocity += acceleration * dt;
+  capsuleSpring.x += capsuleSpring.velocity * dt;
+
+  updateGlowRing(capsuleSpring.x, capsuleSpring.velocity);
+
+  // Settle when motion is negligible
+  if (Math.abs(capsuleSpring.velocity) < 0.3 && Math.abs(displacement) < 0.3) {
     capsuleSpring.x = capsuleSpring.target;
     capsuleSpring.velocity = 0;
     capsuleSpring.running = false;
-    moveGlowRing(capsuleSpring.target);
+    updateGlowRing(capsuleSpring.target, 0);
     return;
   }
 
@@ -244,24 +276,25 @@ function animateCapsuleSpring() {
 }
 
 function switchNavTab(tab) {
-  // Actualizar clases active en los botones capsule
+  // Update active class on capsule buttons
   const items = document.querySelectorAll('.capsule-item');
   items.forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
 
-  // Mover glow ring con spring hacia el ítem seleccionado
+  // Launch spring animation toward the selected item
   const activeBtn = document.querySelector(`.capsule-item[data-tab="${tab}"]`);
   if (activeBtn) {
     const targetX = getCapsuleItemCenter(activeBtn);
     capsuleSpring.target = targetX;
+    capsuleSpring.lastTime = 0; // reset dt
     if (!capsuleSpring.running) {
       capsuleSpring.running = true;
       requestAnimationFrame(animateCapsuleSpring);
     }
   }
 
-  // Mostrar/ocultar tab-views
+  // Toggle tab views
   document.getElementById("tab-content-chats").classList.toggle("active", tab === "chats");
   document.getElementById("tab-content-statuses").classList.toggle("active", tab === "statuses");
   document.getElementById("tab-content-starred").classList.toggle("active", tab === "starred");
@@ -275,17 +308,17 @@ function switchNavTab(tab) {
   if (tab === "friends") loadSocialData();
 }
 
-// Inicializar capsule al cargar
+// Initialize capsule on load & resize
 document.addEventListener("DOMContentLoaded", () => {
   setTimeout(initCapsuleNav, 100);
-  // Re-calcular en resize
   window.addEventListener("resize", () => {
     const activeBtn = document.querySelector('.capsule-item.active');
     if (activeBtn) {
       const pos = getCapsuleItemCenter(activeBtn);
       capsuleSpring.x = pos;
       capsuleSpring.target = pos;
-      moveGlowRing(pos);
+      capsuleSpring.velocity = 0;
+      updateGlowRing(pos, 0);
     }
   });
 });

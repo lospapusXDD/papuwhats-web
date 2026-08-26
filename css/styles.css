@@ -288,41 +288,41 @@ body, html {
   overflow: visible;
 }
 
-/* ── Glow Ring (SVG que se mueve) ── */
+/* ── Glow Ring (SVG que se mueve y se deforma) ── */
 .capsule-glow-ring {
   position: absolute;
   top: 50%;
   left: 0;
-  width: 48px;
-  height: 48px;
+  width: 52px;
+  height: 52px;
   transform: translate(-50%, -50%);
+  transform-origin: center center;
   pointer-events: none;
   z-index: 1;
-  filter: blur(0.5px);
-  /* Posición inicial: primer ítem (se mueve con JS) */
-  transition: none; /* controlado por JS spring */
+  will-change: transform, left;
 }
 
 .glow-halo {
   fill: none;
-  stroke: rgba(255, 190, 60, 0.18);
-  stroke-width: 6;
-  filter: blur(6px);
+  stroke: rgba(255, 190, 60, 0.25);
+  stroke-width: 8;
+  filter: blur(8px);
 }
 
 .glow-core {
   fill: none;
-  stroke: rgba(255, 190, 60, 0.7);
-  stroke-width: 2;
+  stroke: rgba(255, 200, 80, 0.85);
+  stroke-width: 2.2;
+  filter: drop-shadow(0 0 3px rgba(255, 190, 60, 0.6));
 }
 
-/* Pulsación sutil */
+/* Pulsación sutil del glow */
 @keyframes glowPulse {
-  0%, 100% { opacity: 0.7; }
+  0%, 100% { opacity: 0.72; }
   50% { opacity: 1; }
 }
 .capsule-glow-ring {
-  animation: glowPulse 2s ease-in-out infinite;
+  animation: glowPulse 2.2s ease-in-out infinite;
 }
 
 /* ── Capsule Items ── */
