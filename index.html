@@ -87,22 +87,44 @@
         </div>
       </header>
 
-      <nav class="nav-tabs">
-        <button id="nav-chats" class="nav-btn active" onclick="switchNavTab('chats')">
-          Chats
-        </button>
-        <button id="nav-statuses" class="nav-btn" onclick="switchNavTab('statuses')">
-          Estados
-        </button>
-        <button id="nav-starred" class="nav-btn" onclick="switchNavTab('starred')">
-          Destacados
-        </button>
-        <button id="nav-friends" class="nav-btn" onclick="switchNavTab('friends')">
-          Amigos <span id="badge-requests" class="badge hidden">0</span>
-        </button>
-        <button id="nav-settings" class="nav-btn" onclick="switchNavTab('settings')">
-          Ajustes
-        </button>
+      <nav class="capsule-nav" id="capsule-nav">
+        <div class="capsule-track">
+          <svg class="capsule-glow-ring" id="capsule-glow-ring" viewBox="0 0 48 48" width="48" height="48">
+            <circle class="glow-halo" cx="24" cy="24" r="22" />
+            <circle class="glow-core" cx="24" cy="24" r="18" />
+          </svg>
+          <button class="capsule-item active" data-tab="chats" onclick="switchNavTab('chats')">
+            <svg class="capsule-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+            <span>Chats</span>
+          </button>
+          <button class="capsule-item" data-tab="statuses" onclick="switchNavTab('statuses')">
+            <svg class="capsule-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span>Estados</span>
+          </button>
+          <button class="capsule-item" data-tab="starred" onclick="switchNavTab('starred')">
+            <svg class="capsule-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+            </svg>
+            <span>Destacados</span>
+          </button>
+          <button class="capsule-item" data-tab="friends" onclick="switchNavTab('friends')">
+            <svg class="capsule-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="8.5" cy="7" r="4"/><line x1="20" y1="8" x2="20" y2="14"/><line x1="17" y1="11" x2="23" y2="11"/>
+            </svg>
+            <span>Amigos</span>
+            <span id="badge-requests" class="badge hidden">0</span>
+          </button>
+          <button class="capsule-item" data-tab="settings" onclick="switchNavTab('settings')">
+            <svg class="capsule-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+              <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+            </svg>
+            <span>Ajustes</span>
+          </button>
+        </div>
       </nav>
 
       <!-- Tab 1: Chats -->

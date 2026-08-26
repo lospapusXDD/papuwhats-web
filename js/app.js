@@ -53,6 +53,9 @@ function showMainScreen(nick) {
       loadRecentChats();
     }
   }, 3000);
+
+  // Inicializar la posición del glow ring de la cápsula
+  setTimeout(initCapsuleNav, 150);
 }
 
 async function initGlobalMessageTracking() {
@@ -185,14 +188,80 @@ function changeMyProfileAvatar(e) {
   reader.readAsDataURL(file);
 }
 
-function switchNavTab(tab) {
-  document.getElementById("nav-chats").classList.toggle("active", tab === "chats");
-  document.getElementById("nav-statuses").classList.toggle("active", tab === "statuses");
-  document.getElementById("nav-starred").classList.toggle("active", tab === "starred");
-  document.getElementById("nav-friends").classList.toggle("active", tab === "friends");
-  const navSettings = document.getElementById("nav-settings");
-  if (navSettings) navSettings.classList.toggle("active", tab === "settings");
+// ─── Capsule Nav: Spring-Physics Glow Ring ───
+let capsuleSpring = { x: 0, velocity: 0, target: 0, running: false };
+const SPRING_DAMPING = 22;
+const SPRING_STIFFNESS = 235;
 
+function initCapsuleNav() {
+  const items = document.querySelectorAll('.capsule-item');
+  if (!items.length) return;
+  // Posicionar el ring sobre el primer ítem activo
+  requestAnimationFrame(() => {
+    const activeItem = document.querySelector('.capsule-item.active');
+    if (activeItem) {
+      const pos = getCapsuleItemCenter(activeItem);
+      capsuleSpring.x = pos;
+      capsuleSpring.target = pos;
+      moveGlowRing(pos);
+    }
+  });
+}
+
+function getCapsuleItemCenter(el) {
+  const track = document.querySelector('.capsule-track');
+  if (!track || !el) return 0;
+  const trackRect = track.getBoundingClientRect();
+  const elRect = el.getBoundingClientRect();
+  return (elRect.left + elRect.width / 2) - trackRect.left;
+}
+
+function moveGlowRing(xPx) {
+  const ring = document.getElementById('capsule-glow-ring');
+  if (ring) ring.style.left = xPx + 'px';
+}
+
+function animateCapsuleSpring() {
+  if (!capsuleSpring.running) return;
+
+  const dx = capsuleSpring.x - capsuleSpring.target;
+  const ax = (-SPRING_STIFFNESS * dx) - (SPRING_DAMPING * capsuleSpring.velocity);
+  capsuleSpring.velocity += ax * (1 / 60);
+  capsuleSpring.x += capsuleSpring.velocity * (1 / 60);
+
+  moveGlowRing(capsuleSpring.x);
+
+  // Frenar cuando ya está cerca del destino
+  if (Math.abs(capsuleSpring.velocity) < 0.1 && Math.abs(dx) < 0.2) {
+    capsuleSpring.x = capsuleSpring.target;
+    capsuleSpring.velocity = 0;
+    capsuleSpring.running = false;
+    moveGlowRing(capsuleSpring.target);
+    return;
+  }
+
+  requestAnimationFrame(animateCapsuleSpring);
+}
+
+function switchNavTab(tab) {
+  // Actualizar clases active en los botones capsule
+  const items = document.querySelectorAll('.capsule-item');
+  items.forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.tab === tab);
+  });
+
+  // Mover glow ring con spring hacia el ítem seleccionado
+  const activeBtn = document.querySelector(`.capsule-item[data-tab="${tab}"]`);
+  if (activeBtn) {
+    const targetX = getCapsuleItemCenter(activeBtn);
+    capsuleSpring.target = targetX;
+    if (!capsuleSpring.running) {
+      capsuleSpring.running = true;
+      requestAnimationFrame(animateCapsuleSpring);
+    }
+  }
+
+  // Mostrar/ocultar tab-views
   document.getElementById("tab-content-chats").classList.toggle("active", tab === "chats");
   document.getElementById("tab-content-statuses").classList.toggle("active", tab === "statuses");
   document.getElementById("tab-content-starred").classList.toggle("active", tab === "starred");
@@ -205,6 +274,21 @@ function switchNavTab(tab) {
   if (tab === "starred") loadStarredMessages();
   if (tab === "friends") loadSocialData();
 }
+
+// Inicializar capsule al cargar
+document.addEventListener("DOMContentLoaded", () => {
+  setTimeout(initCapsuleNav, 100);
+  // Re-calcular en resize
+  window.addEventListener("resize", () => {
+    const activeBtn = document.querySelector('.capsule-item.active');
+    if (activeBtn) {
+      const pos = getCapsuleItemCenter(activeBtn);
+      capsuleSpring.x = pos;
+      capsuleSpring.target = pos;
+      moveGlowRing(pos);
+    }
+  });
+});
 
 /* Sistema de Estados / Historias Remotas (24 horas sincronizadas) */
 async function uploadMyStatus(e) {

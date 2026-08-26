@@ -258,36 +258,115 @@ body, html {
 }
 
 /* Tabs Navegación */
-.nav-tabs {
-  display: flex;
-  background: var(--bg-card);
-  border-bottom: 1px solid var(--border-color);
-}
-
-.nav-btn {
-  flex: 1;
-  padding: 12px;
-  background: transparent;
-  border: none;
-  color: var(--text-secondary);
-  font-size: 14px;
-  font-weight: 600;
-  cursor: pointer;
-  position: relative;
-}
-
-.nav-btn.active {
-  color: var(--accent-green);
-}
-
-.nav-btn.active::after {
-  content: '';
-  position: absolute;
+/* ─── Floating Capsule Nav Bar (ARC style) ─── */
+.capsule-nav {
+  position: sticky;
   bottom: 0;
-  left: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  padding: 0 12px 10px;
+  background: transparent;
+  pointer-events: none;
+}
+
+.capsule-track {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-evenly;
   width: 100%;
-  height: 3px;
-  background-color: var(--accent-green);
+  max-width: 480px;
+  height: 62px;
+  background: rgba(10, 10, 14, 0.72);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  border-radius: 999px;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 4px 24px rgba(0,0,0,0.45), inset 0 1px 0 rgba(255,255,255,0.04);
+  pointer-events: all;
+  overflow: visible;
+}
+
+/* ── Glow Ring (SVG que se mueve) ── */
+.capsule-glow-ring {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 48px;
+  height: 48px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  z-index: 1;
+  filter: blur(0.5px);
+  /* Posición inicial: primer ítem (se mueve con JS) */
+  transition: none; /* controlado por JS spring */
+}
+
+.glow-halo {
+  fill: none;
+  stroke: rgba(255, 190, 60, 0.18);
+  stroke-width: 6;
+  filter: blur(6px);
+}
+
+.glow-core {
+  fill: none;
+  stroke: rgba(255, 190, 60, 0.7);
+  stroke-width: 2;
+}
+
+/* Pulsación sutil */
+@keyframes glowPulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+.capsule-glow-ring {
+  animation: glowPulse 2s ease-in-out infinite;
+}
+
+/* ── Capsule Items ── */
+.capsule-item {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex: 1;
+  padding: 6px 0;
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.40);
+  cursor: pointer;
+  transition: color 0.25s ease, transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1), opacity 0.25s ease;
+  opacity: 0.55;
+  transform: scale(1);
+  -webkit-tap-highlight-color: transparent;
+}
+
+.capsule-item.active {
+  color: #ffbe3c;
+  opacity: 1;
+  transform: scale(1.12);
+}
+
+.capsule-icon {
+  width: 22px;
+  height: 22px;
+}
+
+.capsule-item.active .capsule-icon {
+  stroke: #ffbe3c;
+  filter: drop-shadow(0 0 4px rgba(255,190,60,0.5));
+}
+
+.capsule-item span {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
 }
 
 .badge {
