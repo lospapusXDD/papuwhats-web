@@ -188,113 +188,144 @@ function changeMyProfileAvatar(e) {
   reader.readAsDataURL(file);
 }
 
-// ─── Capsule Nav: Spring-Physics Glow Ring with Stretch Deformation ───
-// Spring constants matching Jetpack Compose:
-//   Spring.StiffnessLow = 200
-//   Spring.DampingRatioMediumBouncy = 0.5
-//   damping = 2 * dampingRatio * sqrt(stiffness) = 2 * 0.5 * √200 ≈ 14.14
-const SPRING_STIFFNESS = 200;
-const SPRING_DAMPING_RATIO = 0.5;
-const SPRING_DAMPING = 2 * SPRING_DAMPING_RATIO * Math.sqrt(SPRING_STIFFNESS); // ~14.14
+// ─── ARC Browser: Light Rod Dual-Spring Engine (Head & Tail Physics) ───
+// En reposo: es un ARO alrededor del ítem activo.
+// En movimiento: la cabeza (head) se dispara hacia el destino, la cola (tail) se rezaga,
+// formando una barra / haz de luz continua ("rod") que conecta ambos puntos,
+// y al llegar la cola se contrae rebotando elásticamente para volver a ser un aro circular.
 
-let capsuleSpring = {
-  x: 0,
-  velocity: 0,
-  target: 0,
+let arcLight = {
+  head: { x: 0, v: 0, target: 0 },
+  tail: { x: 0, v: 0, target: 0 },
   running: false,
-  lastTime: 0,
+  lastTime: 0
 };
 
+// Constantes de resortes estilo Arc
+const HEAD_STIFFNESS = 260;
+const HEAD_DAMPING = 20;
+
+const TAIL_STIFFNESS = 180;
+const TAIL_DAMPING = 16;
+
 function initCapsuleNav() {
-  const items = document.querySelectorAll('.capsule-item');
-  if (!items.length) return;
+  const activeItem = document.querySelector('.capsule-item.active');
+  if (!activeItem) return;
+
   requestAnimationFrame(() => {
-    const activeItem = document.querySelector('.capsule-item.active');
-    if (activeItem) {
-      const pos = getCapsuleItemCenter(activeItem);
-      capsuleSpring.x = pos;
-      capsuleSpring.target = pos;
-      capsuleSpring.velocity = 0;
-      updateGlowRing(pos, 0);
-    }
+    const cx = getCapsuleItemCenter(activeItem);
+    arcLight.head.x = cx;
+    arcLight.head.target = cx;
+    arcLight.head.v = 0;
+
+    arcLight.tail.x = cx;
+    arcLight.tail.target = cx;
+    arcLight.tail.v = 0;
+
+    drawArcLightShape(cx, cx);
   });
 }
 
 function getCapsuleItemCenter(el) {
-  const track = document.querySelector('.capsule-track');
+  const track = document.getElementById('capsule-track');
   if (!track || !el) return 0;
   const trackRect = track.getBoundingClientRect();
   const elRect = el.getBoundingClientRect();
   return (elRect.left + elRect.width / 2) - trackRect.left;
 }
 
-function updateGlowRing(xPx, velocity) {
-  const ring = document.getElementById('capsule-glow-ring');
-  if (!ring) return;
+function drawArcLightShape(hx, tx) {
+  const haloPath = document.getElementById('arc-light-halo');
+  const corePath = document.getElementById('arc-light-core');
+  if (!haloPath || !corePath) return;
 
-  // Stretch deformation based on velocity
-  const speed = Math.abs(velocity);
-  const maxStretch = 0.45;
-  const stretchFactor = Math.min(speed / 600, maxStretch);
-  const scaleX = 1 + stretchFactor;
-  const scaleY = 1 / Math.sqrt(scaleX); // compress vertically to keep area ~constant
+  const cy = 32; // Centro vertical de la cápsula (64px / 2)
+  const r = 21;  // Radio del aro
 
-  ring.style.transform = `translate(-50%, -50%) scaleX(${scaleX.toFixed(3)}) scaleY(${scaleY.toFixed(3)})`;
-  ring.style.left = xPx + 'px';
+  const minX = Math.min(hx, tx);
+  const maxX = Math.max(hx, tx);
+  const dist = maxX - minX;
+
+  let d = '';
+  // Si la distancia es insignificante, dibuja un aro circular perfecto
+  if (dist < 1.5) {
+    d = `M ${minX - r},${cy} a ${r},${r} 0 1,0 ${r * 2},0 a ${r},${r} 0 1,0 -${r * 2},0`;
+  } else {
+    // Si se está desplazando, dibuja la píldora / haz de luz estirado ("Rod")
+    d = `M ${minX},${cy - r} ` +
+        `L ${maxX},${cy - r} ` +
+        `A ${r},${r} 0 0,1 ${maxX + r},${cy} ` +
+        `A ${r},${r} 0 0,1 ${maxX},${cy + r} ` +
+        `L ${minX},${cy + r} ` +
+        `A ${r},${r} 0 0,1 ${minX - r},${cy} ` +
+        `A ${r},${r} 0 0,1 ${minX},${cy - r} Z`;
+  }
+
+  haloPath.setAttribute('d', d);
+  corePath.setAttribute('d', d);
 }
 
-function animateCapsuleSpring(timestamp) {
-  if (!capsuleSpring.running) return;
+function animateArcSpring(timestamp) {
+  if (!arcLight.running) return;
 
-  // Calculate real delta time (capped at 32ms to avoid spiral on tab-switch)
-  if (!capsuleSpring.lastTime) capsuleSpring.lastTime = timestamp;
-  const rawDt = (timestamp - capsuleSpring.lastTime) / 1000;
+  if (!arcLight.lastTime) arcLight.lastTime = timestamp;
+  const rawDt = (timestamp - arcLight.lastTime) / 1000;
   const dt = Math.min(rawDt, 0.032);
-  capsuleSpring.lastTime = timestamp;
+  arcLight.lastTime = timestamp;
 
-  // Spring physics: F = -k*x - c*v
-  const displacement = capsuleSpring.x - capsuleSpring.target;
-  const springForce = -SPRING_STIFFNESS * displacement;
-  const dampingForce = -SPRING_DAMPING * capsuleSpring.velocity;
-  const acceleration = springForce + dampingForce;
+  // 1. Cabeza (acelera rápido hacia el objetivo)
+  const headDx = arcLight.head.x - arcLight.head.target;
+  const headA = (-HEAD_STIFFNESS * headDx) - (HEAD_DAMPING * arcLight.head.v);
+  arcLight.head.v += headA * dt;
+  arcLight.head.x += arcLight.head.v * dt;
 
-  capsuleSpring.velocity += acceleration * dt;
-  capsuleSpring.x += capsuleSpring.velocity * dt;
+  // 2. Cola (sigue a la cabeza o al objetivo con retardo elástico)
+  const tailDx = arcLight.tail.x - arcLight.tail.target;
+  const tailA = (-TAIL_STIFFNESS * tailDx) - (TAIL_DAMPING * arcLight.tail.v);
+  arcLight.tail.v += tailA * dt;
+  arcLight.tail.x += arcLight.tail.v * dt;
 
-  updateGlowRing(capsuleSpring.x, capsuleSpring.velocity);
+  drawArcLightShape(arcLight.head.x, arcLight.tail.x);
 
-  // Settle when motion is negligible
-  if (Math.abs(capsuleSpring.velocity) < 0.3 && Math.abs(displacement) < 0.3) {
-    capsuleSpring.x = capsuleSpring.target;
-    capsuleSpring.velocity = 0;
-    capsuleSpring.running = false;
-    updateGlowRing(capsuleSpring.target, 0);
+  // Condición de parada (cuando ambos llegaron y se estabilizaron)
+  const headSettled = Math.abs(arcLight.head.v) < 0.2 && Math.abs(headDx) < 0.2;
+  const tailSettled = Math.abs(arcLight.tail.v) < 0.2 && Math.abs(tailDx) < 0.2;
+
+  if (headSettled && tailSettled) {
+    arcLight.head.x = arcLight.head.target;
+    arcLight.head.v = 0;
+    arcLight.tail.x = arcLight.tail.target;
+    arcLight.tail.v = 0;
+    arcLight.running = false;
+    drawArcLightShape(arcLight.head.target, arcLight.tail.target);
     return;
   }
 
-  requestAnimationFrame(animateCapsuleSpring);
+  requestAnimationFrame(animateArcSpring);
 }
 
 function switchNavTab(tab) {
-  // Update active class on capsule buttons
+  // Actualizar clase activa en los ítems
   const items = document.querySelectorAll('.capsule-item');
   items.forEach(btn => {
     btn.classList.toggle('active', btn.dataset.tab === tab);
   });
 
-  // Launch spring animation toward the selected item
+  // Disparar la luz elástica de Arc
   const activeBtn = document.querySelector(`.capsule-item[data-tab="${tab}"]`);
   if (activeBtn) {
     const targetX = getCapsuleItemCenter(activeBtn);
-    capsuleSpring.target = targetX;
-    capsuleSpring.lastTime = 0; // reset dt
-    if (!capsuleSpring.running) {
-      capsuleSpring.running = true;
-      requestAnimationFrame(animateCapsuleSpring);
+    arcLight.head.target = targetX;
+    arcLight.tail.target = targetX;
+    arcLight.lastTime = 0;
+
+    if (!arcLight.running) {
+      arcLight.running = true;
+      requestAnimationFrame(animateArcSpring);
     }
   }
 
-  // Toggle tab views
+  // Alternar vistas
   document.getElementById("tab-content-chats").classList.toggle("active", tab === "chats");
   document.getElementById("tab-content-statuses").classList.toggle("active", tab === "statuses");
   document.getElementById("tab-content-starred").classList.toggle("active", tab === "starred");
@@ -308,17 +339,20 @@ function switchNavTab(tab) {
   if (tab === "friends") loadSocialData();
 }
 
-// Initialize capsule on load & resize
+// Inicializar en carga y reajustes
 document.addEventListener("DOMContentLoaded", () => {
-  setTimeout(initCapsuleNav, 100);
+  setTimeout(initCapsuleNav, 150);
   window.addEventListener("resize", () => {
     const activeBtn = document.querySelector('.capsule-item.active');
     if (activeBtn) {
       const pos = getCapsuleItemCenter(activeBtn);
-      capsuleSpring.x = pos;
-      capsuleSpring.target = pos;
-      capsuleSpring.velocity = 0;
-      updateGlowRing(pos, 0);
+      arcLight.head.x = pos;
+      arcLight.head.target = pos;
+      arcLight.head.v = 0;
+      arcLight.tail.x = pos;
+      arcLight.tail.target = pos;
+      arcLight.tail.v = 0;
+      drawArcLightShape(pos, pos);
     }
   });
 });
