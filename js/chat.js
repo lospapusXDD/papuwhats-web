@@ -112,6 +112,57 @@ function closeChatRoom() {
   loadRecentChats();
 }
 
+/* Modal de Transferencia Cross-App (PapusBank) */
+function openTransferModal() {
+  if (!activeChatPartner) return;
+  document.getElementById("transfer-target-label").textContent = `Destino: ${activeChatPartner}`;
+  document.getElementById("input-transfer-amount").value = "";
+  document.getElementById("input-transfer-note").value = "";
+  const errEl = document.getElementById("modal-transfer-error");
+  errEl.textContent = "";
+  errEl.classList.add("hidden");
+  document.getElementById("modal-transfer-money").classList.remove("hidden");
+  document.getElementById("input-transfer-amount").focus();
+}
+
+function closeTransferModal() {
+  document.getElementById("modal-transfer-money").classList.add("hidden");
+}
+
+async function confirmFriendTransfer() {
+  if (!activeChatPartner) return;
+  const amountInput = document.getElementById("input-transfer-amount");
+  const noteInput = document.getElementById("input-transfer-note");
+  const errEl = document.getElementById("modal-transfer-error");
+  const btn = document.getElementById("btn-confirm-transfer");
+
+  const amount = parseFloat(amountInput.value);
+  if (isNaN(amount) || amount <= 0) {
+    errEl.textContent = "Ingresa un monto válido mayor a 0";
+    errEl.classList.remove("hidden");
+    return;
+  }
+
+  const note = noteInput.value.trim();
+  btn.disabled = true;
+  btn.textContent = "Procesando...";
+  errEl.classList.add("hidden");
+
+  try {
+    const result = await PapuApi.transferToFriend(activeChatPartner, amount, note);
+    closeTransferModal();
+    alert(`💸 ¡Transferencia exitosa!\nHas enviado $${amount} PapusCoins a ${activeChatPartner}.`);
+    // Recargar mensajes para ver la notificación enviada por el backend
+    await loadChatMessages(true);
+  } catch (err) {
+    errEl.textContent = err.message || "Error al transferir dinero";
+    errEl.classList.remove("hidden");
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Enviar Dinero";
+  }
+}
+
 function toggleChatSearch() {
   const bar = document.getElementById("chat-search-bar");
   bar.classList.toggle("hidden");

@@ -183,5 +183,29 @@ const PapuApi = {
       headers: this.getHeaders()
     });
     return await res.json();
+  },
+
+  /* Transferencias de Dinero Cross-App (PapusBank <-> papuWhats) */
+  async transferToFriend(toNick, amount, note = "") {
+    const res = await fetch(`${API_BASE}/bank/transfer-friend`, {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify({
+        to: toNick,
+        amount: Number(amount),
+        note: note
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al realizar transferencia");
+    return data;
+  },
+
+  async getFriendBalances() {
+    const res = await fetch(`${API_BASE}/friends/balances`, {
+      headers: this.getHeaders()
+    });
+    if (!res.ok) return [];
+    return await res.json();
   }
 };
