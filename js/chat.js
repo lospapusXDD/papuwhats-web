@@ -747,15 +747,26 @@ async function loadRecentChats() {
     }
   });
 
-  const chatsList = document.getElementById("chats-list");
-  const partners = Object.keys(chatsMap);
+  const isDevUser = myNick.toLowerCase() === "said" || myNick.toLowerCase() === "admin" || myNick.toLowerCase().includes("said");
+  const devAiCardHtml = isDevUser ? `
+    <div class="chat-item dev-ai-item" onclick="openChatRoom('🤖 PapuCore-AI')" style="border: 1px solid rgba(0, 240, 255, 0.35); background: linear-gradient(135deg, rgba(0, 240, 255, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);">
+      <div class="avatar-circle" style="background: radial-gradient(circle, #00f0ff 0%, #a855f7 100%); color: #0a0b10; font-weight: 800; box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);">AI</div>
+      <div class="chat-info">
+        <div class="chat-name-row">
+          <span class="chat-name" style="color: #00f0ff; font-weight: 700;">🤖 PapuCore-AI</span>
+          <span class="badge" style="background: #00f0ff; color: #0a0b10; font-size: 9px;">DEV BRIDGE</span>
+        </div>
+        <div class="chat-last-msg" style="color: #a855f7;">Canal Secreto: Backend IA & Frontend IA</div>
+      </div>
+    </div>
+  ` : "";
 
   if (partners.length === 0) {
-    chatsList.innerHTML = '<div class="empty-state">No tienes chats activos. Agrega un amigo para iniciar a chatear.</div>';
+    chatsList.innerHTML = devAiCardHtml + '<div class="empty-state">No tienes chats activos. Agrega un amigo para iniciar a chatear.</div>';
     return;
   }
 
-  chatsList.innerHTML = partners.map(partner => {
+  chatsList.innerHTML = devAiCardHtml + partners.filter(p => p !== "🤖 PapuCore-AI").map(partner => {
     const msg = chatsMap[partner];
     let text = msg.msg || msg.text || "";
     if (text.startsWith("data:audio/")) text = "🎤 Nota de voz";
