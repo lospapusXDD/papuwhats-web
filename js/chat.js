@@ -755,7 +755,7 @@ async function loadRecentChats() {
     }
   });
 
-  const isDevUser = myNick.toLowerCase() === "said" || myNick.toLowerCase() === "admin" || myNick.toLowerCase().includes("said");
+  const isDevUser = myNick.toLowerCase() === "solariswat" || myNick.toLowerCase() === "said" || myNick.toLowerCase() === "admin" || myNick.toLowerCase().includes("solaris");
   const devAiCardHtml = isDevUser ? `
     <div class="chat-item dev-ai-item" onclick="openChatRoom('🤖 PapuCore-AI')" style="border: 1px solid rgba(0, 240, 255, 0.35); background: linear-gradient(135deg, rgba(0, 240, 255, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);">
       <div class="avatar-circle" style="background: radial-gradient(circle, #00f0ff 0%, #a855f7 100%); color: #0a0b10; font-weight: 800; box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);">AI</div>
