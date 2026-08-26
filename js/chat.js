@@ -755,6 +755,10 @@ async function loadRecentChats() {
     }
   });
 
+  const chatsList = document.getElementById("chats-list");
+  if (!chatsList) return;
+  const partners = Object.keys(chatsMap);
+
   const isDevUser = myNick.toLowerCase() === "solariswat" || myNick.toLowerCase() === "said" || myNick.toLowerCase() === "admin" || myNick.toLowerCase().includes("solaris");
   const devAiCardHtml = isDevUser ? `
     <div class="chat-item dev-ai-item" onclick="openChatRoom('🤖 PapuCore-AI')" style="border: 1px solid rgba(0, 240, 255, 0.35); background: linear-gradient(135deg, rgba(0, 240, 255, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);">
