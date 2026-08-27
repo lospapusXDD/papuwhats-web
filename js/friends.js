@@ -11,8 +11,19 @@ async function loadSocialData() {
   let extra = profile.secretAchievements || profile.secret_achievements || {};
   if (Array.isArray(extra)) extra = {};
 
-  currentFriends = extra.friends || [];
+  let profileFriends = extra.friends || [];
   pendingRequests = extra.friend_requests_pending || [];
+
+  // 1. Intentar obtener amigos desde la API de PapusBank / PapuWhats
+  try {
+    const backendFriends = await PapuApi.fetchFriends();
+    if (backendFriends && Array.isArray(backendFriends)) {
+      const apiFriendNicks = backendFriends.map(f => typeof f === "string" ? f : (f.nick || f.username || f.friendNick)).filter(Boolean);
+      profileFriends = Array.from(new Set([...profileFriends, ...apiFriendNicks]));
+    }
+  } catch (e) {}
+
+  currentFriends = profileFriends;
 
   // Sincronizar avatares de todos los amigos
   for (const fNick of [...currentFriends, ...pendingRequests]) {
@@ -130,6 +141,12 @@ async function sendFriendRequest() {
   }
   targetExtra.friend_requests_pending = reqs;
 
+  // 1. Intentar llamar al backend nativo de PapusBank
+  try {
+    await PapuApi.sendFriendRequest(targetNick);
+  } catch (e) {}
+
+  // 2. Mantener sincronizado en secretAchievements
   await PapuApi.updateUser(targetNick, { secretAchievements: targetExtra });
   hideAddFriendModal();
 
@@ -149,7 +166,12 @@ async function acceptFriendRequest(fromNick) {
   if (Array.isArray(myExtra)) myExtra = {};
   if (Array.isArray(fromExtra)) fromExtra = {};
 
-  // Agregar a lista de amigos mutua
+  // 1. Intentar aceptar en el backend nativo de PapusBank
+  try {
+    await PapuApi.acceptFriendRequest(fromNick);
+  } catch (e) {}
+
+  // 2. Agregar a lista de amigos mutua en secretAchievements
   let myFriends = myExtra.friends || [];
   if (!myFriends.includes(fromNick)) myFriends.push(fromNick);
   myExtra.friends = myFriends;

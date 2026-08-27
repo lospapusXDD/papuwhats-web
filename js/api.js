@@ -207,5 +207,50 @@ const PapuApi = {
     });
     if (!res.ok) return [];
     return await res.json();
+  },
+
+  /* Endpoints Nativos de Amigos Backend */
+  async fetchFriends() {
+    // 1. Probar ruta nativa de PapusBank
+    try {
+      const res = await fetch("https://judges-acm-riders-musical.trycloudflare.com/papuwhats/friends", {
+        headers: this.getHeaders()
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {}
+
+    // 2. Probar ruta API
+    try {
+      const res2 = await fetch(`${API_BASE}/friends/balances`, {
+        headers: this.getHeaders()
+      });
+      if (res2.ok) return await res2.json();
+    } catch (e) {}
+
+    return null;
+  },
+
+  async sendFriendRequest(targetNick) {
+    try {
+      const res = await fetch(`${API_BASE}/friends/request`, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ to: targetNick, toNick: targetNick })
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {}
+    return null;
+  },
+
+  async acceptFriendRequest(fromNick) {
+    try {
+      const res = await fetch(`${API_BASE}/friends/accept`, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ from: fromNick, fromNick: fromNick })
+      });
+      if (res.ok) return await res.json();
+    } catch (e) {}
+    return null;
   }
 };
