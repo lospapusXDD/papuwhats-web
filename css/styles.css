@@ -1,21 +1,21 @@
 :root {
-  --bg-dark: #0a0b10;
-  --bg-panel: #0f111a;
-  --bg-card: #151824;
-  --bg-chat: #0a0b10;
-  --accent-green: #00f0ff; /* Neon Cyan (Hyprland Primary) */
-  --accent-green-hover: #00c8d6;
-  --accent-violet: #a855f7; /* Hyprland Purple */
-  --accent-magenta: #ec4899; /* Hyprland Pink/Magenta */
+  --bg-dark: #030712;
+  --bg-panel: rgba(13, 17, 23, 0.75);
+  --bg-card: rgba(15, 23, 42, 0.65);
+  --bg-chat: #030712;
+  --accent-green: #38bdf8; /* Velocity Sky Blue (Hyprland Primary) */
+  --accent-green-hover: #0ea5e9;
+  --accent-violet: #6366f1; /* Velocity Indigo */
+  --accent-magenta: #ec4899; /* Velocity Pink/Magenta */
   --text-primary: #f8fafc;
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
-  --border-color: #1e293b;
-  --msg-out: #1e1b4b;
-  --msg-in: #151824;
-  --danger: #f43f5e;
-  --accent-gold: #00f0ff;
-  --font-main: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --border-color: rgba(255, 255, 255, 0.12);
+  --msg-out: linear-gradient(135deg, rgba(14, 165, 233, 0.25) 0%, rgba(99, 102, 241, 0.35) 100%);
+  --msg-in: rgba(15, 23, 42, 0.65);
+  --danger: #f87171;
+  --accent-gold: #38bdf8;
+  --font-main: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, Roboto, sans-serif;
 }
 
 * {
@@ -29,7 +29,13 @@
 body, html {
   width: 100%;
   height: 100%;
-  background-color: var(--bg-dark);
+  background-color: #030712;
+  background-image: 
+    radial-gradient(circle at 20% 20%, rgba(99, 102, 241, 0.22) 0%, transparent 45%),
+    radial-gradient(circle at 80% 80%, rgba(236, 72, 153, 0.18) 0%, transparent 45%),
+    radial-gradient(circle at 50% 50%, rgba(56, 189, 248, 0.12) 0%, transparent 50%);
+  background-size: cover;
+  background-position: center;
   color: var(--text-primary);
   overflow: hidden;
 }
@@ -41,7 +47,7 @@ body, html {
   overflow: hidden;
 }
 
-/* Pantallas - Hyprland Spring Bubble (sin filter:blur para compatibilidad Android WebView) */
+/* Pantallas - Hyprland Spring Bubble */
 .screen {
   position: absolute;
   top: 0;
@@ -50,7 +56,7 @@ body, html {
   height: 100%;
   display: flex;
   flex-direction: column;
-  background-color: var(--bg-panel);
+  background-color: rgba(3, 7, 18, 0.85);
   opacity: 0;
   pointer-events: none;
   transition: opacity 0.35s cubic-bezier(0.34, 1.56, 0.64, 1), transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
@@ -65,22 +71,23 @@ body, html {
   z-index: 10;
 }
 
-/* Pantalla de Auth - Estilo Hyprland */
+/* Pantalla de Auth - Estilo Velocity Hyprland Glassmorphism */
 #auth-screen {
   justify-content: center;
   align-items: center;
   padding: 20px;
-  background: radial-gradient(circle at top, #141726 0%, #08090d 100%);
+  background: transparent;
 }
 
 .auth-card {
   width: 100%;
-  max-width: 390px;
-  background-color: var(--bg-card);
-  border-radius: 24px;
+  max-width: 400px;
+  background: rgba(13, 17, 23, 0.65);
+  border-radius: 20px;
   padding: 32px 26px;
-  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.65), 0 0 25px rgba(0, 240, 255, 0.08);
-  border: 1px solid rgba(0, 240, 255, 0.22);
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-top: 1px solid rgba(255, 255, 255, 0.3);
   transform: translateZ(0);
 }
 
@@ -90,41 +97,41 @@ body, html {
 }
 
 .brand-logo {
-  width: 60px;
-  height: 60px;
+  width: 64px;
+  height: 64px;
   margin: 0 auto 14px;
-  background: radial-gradient(circle, rgba(0, 240, 255, 0.2) 0%, rgba(168, 85, 247, 0.08) 100%);
-  color: var(--accent-green);
-  border-radius: 18px;
-  border: 1px solid rgba(0, 240, 255, 0.4);
-  box-shadow: 0 0 20px rgba(0, 240, 255, 0.35);
+  background: radial-gradient(circle, rgba(56, 189, 248, 0.25) 0%, rgba(99, 102, 241, 0.1) 100%);
+  color: #38bdf8;
+  border-radius: 20px;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 25px rgba(56, 189, 248, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .brand-header h1 {
-  font-size: 24px;
+  font-size: 26px;
   font-weight: 800;
   letter-spacing: -0.5px;
-  background: linear-gradient(135deg, #00f0ff 0%, #a855f7 100%);
+  background: linear-gradient(135deg, #ffffff 0%, #38bdf8 50%, #a855f7 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
 .brand-header p {
   font-size: 13px;
-  color: var(--text-secondary);
+  color: #94a3b8;
   margin-top: 4px;
 }
 
 .auth-tabs {
   display: flex;
-  background: var(--bg-panel);
-  border-radius: 14px;
+  background: rgba(15, 23, 42, 0.7);
+  border-radius: 12px;
   padding: 4px;
   margin-bottom: 20px;
-  border: 1px solid rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .tab-btn {
@@ -135,16 +142,16 @@ body, html {
   padding: 10px 0;
   font-size: 13px;
   font-weight: 600;
-  border-radius: 10px;
+  border-radius: 9px;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .tab-btn.active {
-  background: linear-gradient(135deg, rgba(0, 240, 255, 0.15), rgba(168, 85, 247, 0.15));
-  color: #00f0ff;
-  border: 1px solid rgba(0, 240, 255, 0.35);
-  box-shadow: 0 0 14px rgba(0, 240, 255, 0.2);
+  background: linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(99, 102, 241, 0.2));
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
 }
 
 .input-group {
@@ -154,7 +161,7 @@ body, html {
 .input-group label {
   display: block;
   font-size: 12px;
-  color: var(--text-secondary);
+  color: #cbd5e1;
   margin-bottom: 6px;
   font-weight: 600;
   letter-spacing: 0.2px;
@@ -162,33 +169,34 @@ body, html {
 
 .input-group input {
   width: 100%;
-  padding: 13px 16px;
-  background: var(--bg-panel);
-  border: 1.5px solid var(--border-color);
-  border-radius: 12px;
+  padding: 12px 16px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
   color: var(--text-primary);
   font-size: 14px;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .input-group input:focus {
-  border-color: #00f0ff;
-  box-shadow: 0 0 16px rgba(0, 240, 255, 0.3);
+  border-color: #38bdf8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.35), inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .primary-btn {
   width: 100%;
-  padding: 14px;
-  background: linear-gradient(135deg, #00f0ff 0%, #a855f7 100%);
-  color: #08090d;
+  padding: 13px;
+  background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 50%, #ec4899 100%);
+  color: #ffffff;
   border: none;
-  border-radius: 14px;
+  border-radius: 10px;
   font-size: 14px;
-  font-weight: 800;
-  letter-spacing: 0.4px;
+  font-weight: 700;
+  letter-spacing: 0.3px;
   cursor: pointer;
-  box-shadow: 0 4px 20px rgba(0, 240, 255, 0.35);
+  box-shadow: 0 4px 18px rgba(14, 165, 233, 0.45);
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), filter 0.2s ease;
 }
 
@@ -422,18 +430,19 @@ body, html {
 .search-bar input {
   width: 100%;
   padding: 12px 16px;
-  background: var(--bg-card);
-  border: 1.5px solid var(--border-color);
-  border-radius: 16px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
   color: var(--text-primary);
   font-size: 13px;
   outline: none;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .search-bar input:focus {
-  border-color: #00f0ff;
-  box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+  border-color: #38bdf8;
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.3), inset 0 2px 4px rgba(0, 0, 0, 0.3);
 }
 
 .list-container {
@@ -442,25 +451,26 @@ body, html {
   gap: 10px;
 }
 
-/* Tarjetas Flotantes Hyprland (Cards con borde interactivo y spring tap) */
+/* Tarjetas Flotantes Velocity Glassmorphism (Cards con borde iluminado y spring tap) */
 .chat-item, .friend-item, .settings-card, .status-my-card, .starred-item {
   display: flex;
   align-items: center;
   padding: 14px 16px;
-  background: var(--bg-card);
-  border-radius: 18px;
+  background: rgba(15, 23, 42, 0.65);
+  border-radius: 16px;
   gap: 12px;
   cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1), border-color 0.2s ease, box-shadow 0.2s ease;
   transform: translateZ(0);
 }
 
 .chat-item:active, .friend-item:active, .starred-item:active {
   transform: scale(0.97) translateZ(0);
-  border-color: rgba(0, 240, 255, 0.5);
-  box-shadow: 0 0 16px rgba(0, 240, 255, 0.25);
+  border-color: rgba(56, 189, 248, 0.5);
+  box-shadow: 0 0 16px rgba(56, 189, 248, 0.25);
 }
 
 .chat-info {
@@ -577,20 +587,23 @@ body, html {
 
 .message-bubble.out {
   align-self: flex-end;
-  background: linear-gradient(135deg, #1e1b4b 0%, #2e1065 100%);
-  color: #f8fafc;
-  border: 1px solid rgba(168, 85, 247, 0.3);
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.35) 0%, rgba(99, 102, 241, 0.45) 50%, rgba(236, 72, 153, 0.35) 100%);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-top: 1px solid rgba(255, 255, 255, 0.35);
   border-bottom-right-radius: 4px;
-  box-shadow: 0 4px 16px rgba(168, 85, 247, 0.15);
+  box-shadow: 0 4px 18px rgba(14, 165, 233, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transform-origin: bottom right;
 }
 
 .message-bubble.in {
   align-self: flex-start;
-  background: var(--bg-card);
+  background: rgba(15, 23, 42, 0.75);
   color: #f8fafc;
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
   border-bottom-left-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.1);
   transform-origin: bottom left;
 }
 
