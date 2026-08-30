@@ -18,7 +18,10 @@ const PapuApi = {
   },
 
   getHeaders() {
-    const headers = { "Content-Type": "application/json" };
+    const headers = { 
+      "Content-Type": "application/json",
+      "ngrok-skip-browser-warning": "true"
+    };
     const token = this.getToken();
     if (token) {
       headers["Authorization"] = `Bearer ${token}`;
@@ -29,7 +32,10 @@ const PapuApi = {
   async login(nick, password) {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true"
+      },
       body: JSON.stringify({ nick, password })
     });
     const data = await res.json();
@@ -49,7 +55,10 @@ const PapuApi = {
   async confirm2FA(tempToken, code) {
     const res = await fetch(`${API_BASE}/auth/2fa/confirm`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true"
+      },
       body: JSON.stringify({ tempToken, code })
     });
     const data = await res.json();
@@ -63,7 +72,10 @@ const PapuApi = {
   async register(nick, password) {
     const res = await fetch(`${API_BASE}/auth/register`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json",
+        "ngrok-skip-browser-warning": "true"
+      },
       body: JSON.stringify({ nick, password, hash: nick })
     });
     const data = await res.json();
