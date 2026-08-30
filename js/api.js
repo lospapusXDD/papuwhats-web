@@ -1,4 +1,5 @@
-const API_BASE = "https://judges-acm-riders-musical.trycloudflare.com/api";
+const API_BASE = "https://doozy-cosigner-sandstorm.ngrok-free.dev/api";
+const PAPUWHATS_BASE = "https://doozy-cosigner-sandstorm.ngrok-free.dev/papuwhats";
 
 const PapuApi = {
   getToken() {
@@ -213,7 +214,7 @@ const PapuApi = {
   async fetchFriends() {
     // 1. Probar ruta nativa de PapusBank
     try {
-      const res = await fetch("https://judges-acm-riders-musical.trycloudflare.com/papuwhats/friends", {
+      const res = await fetch(`${PAPUWHATS_BASE}/friends`, {
         headers: this.getHeaders()
       });
       if (res.ok) return await res.json();
