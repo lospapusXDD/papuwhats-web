@@ -5,14 +5,18 @@ async function loadSocialData() {
   const myNick = localStorage.getItem("papuwhats_nick");
   if (!myNick) return;
 
-  const profile = await PapuApi.getUserProfile(myNick);
-  if (!profile) return;
-
-  let extra = profile.secretAchievements || profile.secret_achievements || {};
-  if (Array.isArray(extra)) extra = {};
-
-  let profileFriends = extra.friends || [];
-  pendingRequests = extra.friend_requests_pending || [];
+  let profileFriends = [];
+  try {
+    const profile = await PapuApi.getUserProfile(myNick);
+    if (profile) {
+      let extra = profile.secretAchievements || profile.secret_achievements || {};
+      if (Array.isArray(extra)) extra = {};
+      profileFriends = extra.friends || [];
+      pendingRequests = extra.friend_requests_pending || [];
+    }
+  } catch (err) {
+    console.warn("Error cargando perfil:", err);
+  }
 
   // 1. Intentar obtener amigos desde la API de PapusBank / PapuWhats
   try {

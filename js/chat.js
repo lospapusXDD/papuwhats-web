@@ -782,35 +782,10 @@ async function loadRecentChats() {
   const myNick = (localStorage.getItem("papuwhats_nick") || "").toLowerCase();
   if (!myNick) return;
 
-  const allMessages = await PapuApi.fetchPrivateMessages();
-  const chatsMap = {};
-  let deletedIds = JSON.parse(localStorage.getItem("deleted_msg_ids") || "[]");
-
-  allMessages.forEach(msg => {
-    const msgId = String(msg.id || msg._id || msg.createdAt);
-    if (deletedIds.includes(msgId)) return;
-
-    // Ignorar eventos de reacción para que no salgan como último mensaje en la lista
-    const rawText = msg.msg || msg.text || "";
-    if (rawText.startsWith("[REACT:")) return;
-
-    const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
-    const to = (msg.to || msg.toNick || msg.to_nick || "").toLowerCase();
-    const time = msg.createdAt || msg.created_at || msg.timestamp;
-
-    if (from === myNick || to === myNick) {
-      const partner = from === myNick ? to : from;
-      if (!chatsMap[partner] || new Date(time) > new Date(chatsMap[partner].timestamp || chatsMap[partner].createdAt || chatsMap[partner].created_at)) {
-        chatsMap[partner] = msg;
-      }
-    }
-  });
-
   const chatsList = document.getElementById("chats-list");
   if (!chatsList) return;
-  const partners = Object.keys(chatsMap);
 
-  const isDevUser = myNick.toLowerCase() === "solariswat" || myNick.toLowerCase() === "said" || myNick.toLowerCase() === "admin" || myNick.toLowerCase().includes("solaris");
+  const isDevUser = myNick === "solariswat" || myNick === "said" || myNick === "admin" || myNick.includes("solaris");
   const devAiCardHtml = isDevUser ? `
     <div class="chat-item dev-ai-item" onclick="openChatRoom('🤖 PapuCore-AI')" style="border: 1px solid rgba(0, 240, 255, 0.35); background: linear-gradient(135deg, rgba(0, 240, 255, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);">
       <div class="avatar-circle" style="background: radial-gradient(circle, #00f0ff 0%, #a855f7 100%); color: #0a0b10; font-weight: 800; box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);">AI</div>
@@ -824,38 +799,70 @@ async function loadRecentChats() {
     </div>
   ` : "";
 
-  if (partners.length === 0) {
-    chatsList.innerHTML = devAiCardHtml + '<div class="empty-state">No tienes chats activos. Agrega un amigo para iniciar a chatear.</div>';
-    return;
-  }
+  try {
+    const allMessages = await PapuApi.fetchPrivateMessages();
+    const chatsMap = {};
+    let deletedIds = JSON.parse(localStorage.getItem("deleted_msg_ids") || "[]");
 
-  chatsList.innerHTML = devAiCardHtml + partners.filter(p => p !== "🤖 PapuCore-AI").map(partner => {
-    const msg = chatsMap[partner];
-    let text = msg.msg || msg.text || "";
-    if (text.startsWith("data:audio/")) text = "🎤 Nota de voz";
-    else if (text.startsWith("data:image/")) text = "📷 Foto";
-    else if (text.startsWith("STICKER:") || text.startsWith("data:sticker/") || msg.mediaType === "sticker") text = "🎨 Sticker";
+    if (Array.isArray(allMessages)) {
+      allMessages.forEach(msg => {
+        const msgId = String(msg.id || msg._id || msg.createdAt);
+        if (deletedIds.includes(msgId)) return;
 
-    const time = msg.createdAt || msg.created_at || msg.timestamp;
-    const timeStr = time ? new Date(time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
-    const customAvatar = localStorage.getItem(`avatar_${partner.toLowerCase()}`);
-    const avatarHtml = customAvatar 
-      ? `<img src="${customAvatar}" class="avatar-circle-img">`
-      : `<div class="avatar-circle">${partner.charAt(0).toUpperCase()}</div>`;
+        const rawText = msg.msg || msg.text || "";
+        if (rawText.startsWith("[REACT:")) return;
 
-    return `
-      <div class="chat-item" onclick="openChatRoom('${partner}')">
-        ${avatarHtml}
-        <div class="chat-info">
-          <div class="chat-name-row">
-            <span class="chat-name">${partner}</span>
-            <span class="chat-time">${timeStr}</span>
+        const from = (msg.from || msg.fromNick || msg.from_nick || "").toLowerCase();
+        const to = (msg.to || msg.toNick || msg.to_nick || "").toLowerCase();
+        const time = msg.createdAt || msg.created_at || msg.timestamp;
+
+        if (from === myNick || to === myNick) {
+          const partner = from === myNick ? to : from;
+          if (!chatsMap[partner] || new Date(time) > new Date(chatsMap[partner].timestamp || chatsMap[partner].createdAt || chatsMap[partner].created_at)) {
+            chatsMap[partner] = msg;
+          }
+        }
+      });
+    }
+
+    const partners = Object.keys(chatsMap);
+
+    if (partners.length === 0) {
+      chatsList.innerHTML = devAiCardHtml + '<div class="empty-state">No tienes chats activos. Agrega un amigo para iniciar a chatear.</div>';
+      return;
+    }
+
+    chatsList.innerHTML = devAiCardHtml + partners.filter(p => !p.includes("papucore-ai") && !p.includes("ai")).map(partner => {
+      const msg = chatsMap[partner];
+      let text = msg.msg || msg.text || "";
+      if (text.startsWith("data:audio/")) text = "🎤 Nota de voz";
+      else if (text.startsWith("data:image/")) text = "📷 Foto";
+      else if (text.startsWith("STICKER:") || text.startsWith("data:sticker/") || msg.mediaType === "sticker") text = "🎨 Sticker";
+
+      const time = msg.createdAt || msg.created_at || msg.timestamp;
+      const timeStr = time ? new Date(time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
+      const customAvatar = localStorage.getItem(`avatar_${partner.toLowerCase()}`);
+      const avatarHtml = customAvatar 
+        ? `<img src="${customAvatar}" class="avatar-circle-img">`
+        : `<div class="avatar-circle">${partner.charAt(0).toUpperCase()}</div>`;
+
+      return `
+        <div class="chat-item" onclick="openChatRoom('${partner}')">
+          ${avatarHtml}
+          <div class="chat-info">
+            <div class="chat-name-row">
+              <span class="chat-name">${partner}</span>
+              <span class="chat-time">${timeStr}</span>
+            </div>
+            <div class="chat-last-msg">${escapeHtml(text)}</div>
           </div>
-          <div class="chat-last-msg">${escapeHtml(text)}</div>
         </div>
-      </div>
-    `;
-  }).join("");
+      `;
+    }).join("");
+  } catch (err) {
+    console.error("Error al cargar chats recientes:", err);
+    chatsList.innerHTML = devAiCardHtml + '<div class="empty-state">Cargando chats...</div>';
+  }
 }
 
 function escapeHtml(text) {
