@@ -586,3 +586,23 @@ function filterChats() {
     item.style.display = nick.includes(query) ? "flex" : "none";
   });
 }
+
+/* Control de Servidor PC Remoto */
+async function handleShutdownServer() {
+  if (!confirm("⚠️ ¿Estás seguro de que deseas APAGAR el servidor PC remotamente?")) return;
+  try {
+    const res = await PapuApi.shutdownServer();
+    alert("🛑 " + (res.message || res.msg || "Comando de apagado enviado al servidor con éxito."));
+  } catch (err) {
+    alert("Error al apagar servidor: " + err.message);
+  }
+}
+
+async function handleWakeOnLanServer() {
+  try {
+    const res = await PapuApi.wakeOnLanServer();
+    alert("🔌 " + (res.message || res.msg || "Paquete mágico Wake-on-LAN enviado."));
+  } catch (err) {
+    alert("Error al enviar WoL: " + err.message);
+  }
+}

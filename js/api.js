@@ -265,5 +265,26 @@ const PapuApi = {
       if (res.ok) return await res.json();
     } catch (e) {}
     return null;
+  },
+
+  /* Servidor Control de Energía (Admin) */
+  async shutdownServer() {
+    const res = await fetch(`${API_BASE}/admin/power/shutdown`, {
+      method: "POST",
+      headers: this.getHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al apagar servidor");
+    return data;
+  },
+
+  async wakeOnLanServer() {
+    const res = await fetch(`${API_BASE}/admin/power/wol`, {
+      method: "POST",
+      headers: this.getHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al enviar paquete WoL");
+    return data;
   }
 };
