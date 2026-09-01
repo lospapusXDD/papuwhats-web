@@ -368,12 +368,12 @@ async function loadChatMessages(forceScroll = false) {
         return false;
       }
 
-      const isAiChat = partner.includes("papucore-ai") || partner.includes("ai");
-      const fromIsAi = from.includes("papucore-ai") || from.includes("ai");
-      const toIsAi = to.includes("papucore-ai") || to.includes("ai");
+      const isAiChat = partner.includes("papucore") || partner.includes("ai") || partner.includes("🤖");
+      const fromIsAi = from.includes("papucore") || from.includes("ai") || from.includes("🤖") || from.includes("??");
+      const toIsAi = to.includes("papucore") || to.includes("ai") || to.includes("🤖") || to.includes("??");
 
       if (isAiChat) {
-        return (from === myNick && toIsAi) || (fromIsAi && to === myNick);
+        return (from === myNick && toIsAi) || (fromIsAi && to === myNick) || (fromIsAi && to.includes("said")) || (from.includes("said") && toIsAi);
       }
 
       return (from === myNick && to === partner) || (from === partner && to === myNick);
@@ -391,49 +391,17 @@ async function loadChatMessages(forceScroll = false) {
       globalKnownMsgIds.add(msgId);
     });
 
-    const isPartnerOnline = await PapuApi.checkUserOnline(activeChatPartner);
+    let isPartnerOnline = false;
+    try {
+      if (activeChatPartner.includes("PapuCore") || activeChatPartner.includes("AI")) {
+        isPartnerOnline = true;
+      } else {
+        isPartnerOnline = await PapuApi.checkUserOnline(activeChatPartner);
+      }
+    } catch (e) {}
 
-    // Construir set de IDs actuales en el DOM
-    const existingBubbles = chatContainer.querySelectorAll('.message-bubble[data-id]');
-    const existingIds = new Set();
-    existingBubbles.forEach(b => existingIds.add(b.getAttribute('data-id')));
-
-    // Construir set de IDs que deberían existir
-    const newMsgIds = new Set(privateMessages.map(msg => String(msg.id || msg._id || msg.createdAt || "")));
-
-    // Si la cantidad de mensajes cambió drásticamente (borrado, primer load), hacer full render
-    const needsFullRender = forceScroll && existingIds.size === 0;
-
-    if (needsFullRender) {
-      // Render completo solo la primera vez o al abrir el chat
-      chatContainer.innerHTML = privateMessages.map(msg => renderMsgBubble(msg, isPartnerOnline, starredIds, reactionsMap, true)).join("");
-    } else {
-      // Eliminar burbujas de mensajes borrados
-      existingBubbles.forEach(b => {
-        if (!newMsgIds.has(b.getAttribute('data-id'))) b.remove();
-      });
-
-      // Actualizar checks de mensajes existentes (online/offline)
-      existingBubbles.forEach(b => {
-        const checkEl = b.querySelector('.double-check');
-        if (checkEl) {
-          checkEl.style.color = isPartnerOnline ? '#53bdeb' : 'var(--text-secondary)';
-        }
-      });
-
-      // Solo agregar mensajes que NO existen en el DOM
-      privateMessages.forEach(msg => {
-        const msgId = String(msg.id || msg._id || msg.createdAt || "");
-        if (!existingIds.has(msgId)) {
-          const tempDiv = document.createElement('div');
-          tempDiv.innerHTML = renderMsgBubble(msg, isPartnerOnline, starredIds, reactionsMap, true);
-          const newBubble = tempDiv.firstElementChild;
-          chatContainer.appendChild(newBubble);
-          // Auto-remover clase de animación cuando termine
-          newBubble.addEventListener('animationend', () => newBubble.classList.remove('bubble-new'), { once: true });
-        }
-      });
-    }
+    // Renderizar mensajes
+    chatContainer.innerHTML = privateMessages.map(msg => renderMsgBubble(msg, isPartnerOnline, starredIds, reactionsMap, false)).join("");
 
     if (forceScroll || !userIsScrolledUp) {
       chatContainer.scrollTop = chatContainer.scrollHeight;
@@ -832,26 +800,29 @@ async function loadRecentChats() {
       return;
     }
 
-    chatsList.innerHTML = devAiCardHtml + partners.filter(p => !p.includes("papucore-ai") && !p.includes("ai")).map(partner => {
+    chatsList.innerHTML = devAiCardHtml + partners.filter(p => !p.includes("papucore") && !p.includes("ai") && !p.includes("🤖") && !p.includes("??")).map(partner => {
       const msg = chatsMap[partner];
       let text = msg.msg || msg.text || "";
       if (text.startsWith("data:audio/")) text = "🎤 Nota de voz";
       else if (text.startsWith("data:image/")) text = "📷 Foto";
       else if (text.startsWith("STICKER:") || text.startsWith("data:sticker/") || msg.mediaType === "sticker") text = "🎨 Sticker";
 
+      // Obtener el nick original con su casing original
+      const origPartner = (msg.from && msg.from.toLowerCase() === partner) ? msg.from : (msg.to && msg.to.toLowerCase() === partner ? msg.to : partner);
+
       const time = msg.createdAt || msg.created_at || msg.timestamp;
       const timeStr = time ? new Date(time).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'}) : "";
       const customAvatar = localStorage.getItem(`avatar_${partner.toLowerCase()}`);
       const avatarHtml = customAvatar 
         ? `<img src="${customAvatar}" class="avatar-circle-img">`
-        : `<div class="avatar-circle">${partner.charAt(0).toUpperCase()}</div>`;
+        : `<div class="avatar-circle">${origPartner.charAt(0).toUpperCase()}</div>`;
 
       return `
-        <div class="chat-item" onclick="openChatRoom('${partner}')">
+        <div class="chat-item" onclick="openChatRoom('${escapeHtml(origPartner)}')">
           ${avatarHtml}
           <div class="chat-info">
             <div class="chat-name-row">
-              <span class="chat-name">${partner}</span>
+              <span class="chat-name">${escapeHtml(origPartner)}</span>
               <span class="chat-time">${timeStr}</span>
             </div>
             <div class="chat-last-msg">${escapeHtml(text)}</div>

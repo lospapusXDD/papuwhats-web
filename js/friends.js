@@ -27,7 +27,33 @@ async function loadSocialData() {
     }
   } catch (e) {}
 
-  currentFriends = profileFriends;
+  // 2. Si no hay amigos en profile/backend, rescatar personas con las que has chateado
+  try {
+    const msgs = await PapuApi.fetchPrivateMessages();
+    if (Array.isArray(msgs)) {
+      msgs.forEach(m => {
+        const f = m.from || m.fromNick || m.from_nick || "";
+        const t = m.to || m.toNick || m.to_nick || "";
+        if (f.toLowerCase() === myNick.toLowerCase() && t && !t.includes("AI") && !t.includes("??")) {
+          profileFriends.push(t);
+        } else if (t.toLowerCase() === myNick.toLowerCase() && f && !f.includes("AI") && !f.includes("??")) {
+          profileFriends.push(f);
+        }
+      });
+    }
+  } catch (e) {}
+
+  // Filtrar duplicados insensible a mayúsculas
+  const uniqueFriendsMap = new Map();
+  profileFriends.forEach(f => {
+    if (f && f.toLowerCase() !== myNick.toLowerCase()) {
+      if (!uniqueFriendsMap.has(f.toLowerCase())) {
+        uniqueFriendsMap.set(f.toLowerCase(), f);
+      }
+    }
+  });
+
+  currentFriends = Array.from(uniqueFriendsMap.values());
 
   // Sincronizar avatares de todos los amigos
   for (const fNick of [...currentFriends, ...pendingRequests]) {
