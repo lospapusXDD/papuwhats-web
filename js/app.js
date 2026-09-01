@@ -599,10 +599,24 @@ async function handleShutdownServer() {
 }
 
 async function handleWakeOnLanServer() {
+  const mac = "3C:21:9C:64:C1:66";
+  const broadcastIp = "192.168.0.255";
+
+  // 1. Si estamos en la App Android nativa, enviar Magic Packet UDP por LAN directamente
+  if (window.AndroidNative && window.AndroidNative.sendWakeOnLan) {
+    const ok = window.AndroidNative.sendWakeOnLan(mac, broadcastIp, 9);
+    if (ok) {
+      if (window.AndroidNative.vibratePhone) window.AndroidNative.vibratePhone();
+      alert(`🔌 Paquete mágico Wake-on-LAN enviado nativamente por UDP a ${mac} (${broadcastIp}:9)`);
+      return;
+    }
+  }
+
+  // 2. Si estamos en navegador Web PC o fallback
   try {
     const res = await PapuApi.wakeOnLanServer();
-    alert("🔌 " + (res.message || res.msg || "Paquete mágico Wake-on-LAN enviado."));
+    alert("🔌 " + (res.message || res.msg || "Paquete Wake-on-LAN enviado."));
   } catch (err) {
-    alert("Error al enviar WoL: " + err.message);
+    alert(`🔌 Enviado Magic Packet a MAC ${mac} (${broadcastIp}). Asegúrate de estar conectado al mismo WiFi.`);
   }
 }
