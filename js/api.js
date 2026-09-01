@@ -157,7 +157,11 @@ const PapuApi = {
       headers: this.getHeaders()
     });
     if (!res.ok) return [];
-    return await res.json();
+    const data = await res.json();
+    // El backend devuelve { messages: [...], total: N } O directamente un array
+    if (Array.isArray(data)) return data;
+    if (data && Array.isArray(data.messages)) return data.messages;
+    return [];
   },
 
   async sendPrivateMessage(toNick, messageText, mediaType = "text") {
