@@ -23,6 +23,21 @@ const PapuApi = {
     localStorage.removeItem("papuwhats_user");
   },
 
+  handleAuthFail() {
+    this.clearToken();
+    localStorage.removeItem("papuwhats_nick");
+    // Evitar spam: solo redirigir una vez
+    if (!window._authFailHandled) {
+      window._authFailHandled = true;
+      console.warn("[PapuApi] 401 Unauthorized -> sesion expirada, redirigiendo a login");
+      if (typeof showAuthScreen === "function") setTimeout(() => showAuthScreen(), 100);
+      else if (window.showAuthScreen) setTimeout(() => window.showAuthScreen(), 100);
+      // Limpiar intervalos para parar el bucle 401
+      if (typeof clearMainIntervals === "function") try{ clearMainIntervals(); }catch(e){}
+      if (typeof chatPollingInterval !== "undefined" && chatPollingInterval) { clearInterval(chatPollingInterval); chatPollingInterval = null; }
+    }
+  },
+
   getHeaders() {
     const headers = { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" };
     const token = this.getToken();
@@ -124,6 +139,7 @@ const PapuApi = {
       const res = await this.fetchWithTimeout(ngrokUrl(`${API_BASE}/users/${encodeURIComponent(nick)}`), {
         headers: this.getHeaders()
       });
+      if (res.status === 401) { this.handleAuthFail(); return null; }
       if (!res.ok) return null;
       return await res.json();
     } catch (e) {
@@ -147,6 +163,7 @@ const PapuApi = {
       headers: this.getHeaders(),
       body: JSON.stringify(userData)
     });
+    if (res.status === 401) { this.handleAuthFail(); throw new Error("Sesion expirada"); }
     return await res.json();
   },
 
@@ -155,6 +172,7 @@ const PapuApi = {
       const res = await this.fetchWithTimeout(ngrokUrl(`${API_BASE}/messages`), {
         headers: this.getHeaders()
       });
+      if (res.status === 401) { this.handleAuthFail(); return []; }
       if (!res.ok) return [];
       const data = await res.json();
       if (Array.isArray(data)) return data;
@@ -223,13 +241,15 @@ const PapuApi = {
       const res = await this.fetchWithTimeout(ngrokUrl(`${PAPUWHATS_BASE}/friends`), {
         headers: this.getHeaders()
       }, 6000);
+      if (res.status === 401) { this.handleAuthFail(); return null; }
       if (res.ok) return await res.json();
     } catch (e) {}
     try {
       const res2 = await this.fetchWithTimeout(ngrokUrl(`${API_BASE}/friends/balances`), {
         headers: this.getHeaders()
       }, 6000);
-      if (res2.ok) return await res2.json();
+      if (res2 && res2.status === 401) { this.handleAuthFail(); return null; }
+      if (res2 && res2.ok) return await res2.json();
     } catch (e) {}
     return null;
   },

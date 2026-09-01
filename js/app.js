@@ -167,9 +167,14 @@ function triggerAppNotification(sender, messageText) {
 }
 window.triggerAppNotification = triggerAppNotification;
 
+let _userHasInteracted = false;
+document.addEventListener("click", () => { _userHasInteracted = true; }, { once: true });
+document.addEventListener("touchstart", () => { _userHasInteracted = true; }, { once: true });
 function playNotificationSound() {
+  if (!_userHasInteracted) return;
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    if (ctx.state === "suspended") ctx.resume();
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.type = "sine";
