@@ -109,12 +109,26 @@ const PapuApi = {
     return info.online;
   },
 
+  async fetchWithTimeout(url, options = {}, timeoutMs = 8000) {
+    const controller = new AbortController();
+    const id = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      const res = await fetch(url, { ...options, signal: controller.signal });
+      return res;
+    } finally { clearTimeout(id); }
+  },
+
   async getUserProfile(nick) {
-    const res = await fetch(ngrokUrl(`${API_BASE}/users/${encodeURIComponent(nick)}`), {
-      headers: this.getHeaders()
-    });
-    if (!res.ok) return null;
-    return await res.json();
+    try {
+      const res = await this.fetchWithTimeout(ngrokUrl(`${API_BASE}/users/${encodeURIComponent(nick)}`), {
+        headers: this.getHeaders()
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      if (e.name === 'AbortError') console.warn(`[api] getUserProfile timeout ${nick}`);
+      throw e;
+    }
   },
 
   async getAllUsers() {
@@ -136,14 +150,19 @@ const PapuApi = {
   },
 
   async fetchPrivateMessages() {
-    const res = await fetch(ngrokUrl(`${API_BASE}/messages`), {
-      headers: this.getHeaders()
-    });
-    if (!res.ok) return [];
-    const data = await res.json();
-    if (Array.isArray(data)) return data;
-    if (data && Array.isArray(data.messages)) return data.messages;
-    return [];
+    try {
+      const res = await this.fetchWithTimeout(ngrokUrl(`${API_BASE}/messages`), {
+        headers: this.getHeaders()
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (Array.isArray(data)) return data;
+      if (data && Array.isArray(data.messages)) return data.messages;
+      return [];
+    } catch (e) {
+      if (e.name === 'AbortError') console.warn('[api] fetchPrivateMessages timeout');
+      throw e;
+    }
   },
 
   async sendPrivateMessage(toNick, messageText, mediaType = "text") {
@@ -200,15 +219,15 @@ const PapuApi = {
 
   async fetchFriends() {
     try {
-      const res = await fetch(ngrokUrl(`${PAPUWHATS_BASE}/friends`), {
+      const res = await this.fetchWithTimeout(ngrokUrl(`${PAPUWHATS_BASE}/friends`), {
         headers: this.getHeaders()
-      });
+      }, 6000);
       if (res.ok) return await res.json();
     } catch (e) {}
     try {
-      const res2 = await fetch(ngrokUrl(`${API_BASE}/friends/balances`), {
+      const res2 = await this.fetchWithTimeout(ngrokUrl(`${API_BASE}/friends/balances`), {
         headers: this.getHeaders()
-      });
+      }, 6000);
       if (res2.ok) return await res2.json();
     } catch (e) {}
     return null;

@@ -56,9 +56,29 @@ function openChatRoom(targetNick) {
   updateChatOnlineStatus(targetNick);
   loadChatMessages(true);
   if (chatPollingInterval) clearInterval(chatPollingInterval);
-  chatPollingInterval = setInterval(() => {
-    loadChatMessages(false);
-    updateChatOnlineStatus(targetNick);
+  // Fix: no pollear si ya hay un interval activo y evitar spam cuando hay error de red
+  let chatFailCount = 0;
+  chatPollingInterval = setInterval(async () => {
+    if (document.hidden) return;
+    try {
+      await loadChatMessages(false);
+      await updateChatOnlineStatus(targetNick);
+      chatFailCount = 0;
+    } catch (e) {
+      chatFailCount++;
+      if (chatFailCount >= 3) {
+        clearInterval(chatPollingInterval);
+        const backoff = Math.min(10000, 2000 * Math.pow(2, chatFailCount - 3));
+        console.warn(`[chat] backoff ${backoff}ms tras ${chatFailCount} fallos`);
+        setTimeout(() => {
+          if (activeChatPartner === targetNick && document.getElementById("chat-room").classList.contains("active")) {
+            chatPollingInterval = setInterval(async () => {
+              try { await loadChatMessages(false); await updateChatOnlineStatus(targetNick); chatFailCount=0; } catch(err){ chatFailCount++; }
+            }, 2000);
+          }
+        }, backoff);
+      }
+    }
   }, 2000);
 }
 
@@ -100,8 +120,9 @@ async function updateChatOnlineStatus(targetNick) {
 function closeChatRoom() {
   document.getElementById("chat-room").classList.remove("active");
   activeChatPartner = null;
+  window.activeChatPartner = null;
   cancelReplyQuote();
-  if (chatPollingInterval) clearInterval(chatPollingInterval);
+  if (chatPollingInterval) { clearInterval(chatPollingInterval); chatPollingInterval = null; }
   if (currentPlayingAudio) {
     currentPlayingAudio.pause();
     currentPlayingAudio = null;

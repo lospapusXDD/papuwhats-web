@@ -1,9 +1,17 @@
 let currentFriends = [];
 let pendingRequests = [];
+let isLoadingSocialData = false;
+let lastSocialDataTime = 0;
 
 async function loadSocialData() {
+  if (isLoadingSocialData) return;
+  const now = Date.now();
+  // debounce 800ms para evitar spam de polling
+  if (now - lastSocialDataTime < 800) return;
+  isLoadingSocialData = true;
+  lastSocialDataTime = now;
   const myNick = localStorage.getItem("papuwhats_nick");
-  if (!myNick) return;
+  if (!myNick) { isLoadingSocialData = false; return; }
 
   let profileFriends = [];
   try {
@@ -71,6 +79,7 @@ async function loadSocialData() {
 
   renderFriendsList();
   renderRequestsList();
+  isLoadingSocialData = false;
 }
 
 function renderFriendsList() {

@@ -16,6 +16,8 @@ function checkSession() {
 }
 
 function showAuthScreen() {
+  clearMainIntervals();
+  if (typeof chatPollingInterval !== 'undefined' && chatPollingInterval) { clearInterval(chatPollingInterval); chatPollingInterval = null; }
   document.getElementById("auth-screen").classList.add("active");
   document.getElementById("main-screen").classList.remove("active");
   document.getElementById("chat-room").classList.remove("active");
@@ -23,8 +25,18 @@ function showAuthScreen() {
 
 let globalKnownMsgIds = new Set();
 let isInitialMessageLoad = true;
+let heartbeatInterval = null;
+let mainPollInterval = null;
+let consecutiveFailCount = 0;
+
+function clearMainIntervals() {
+  if (heartbeatInterval) { clearInterval(heartbeatInterval); heartbeatInterval = null; }
+  if (mainPollInterval) { clearInterval(mainPollInterval); mainPollInterval = null; }
+}
 
 function showMainScreen(nick) {
+  // Evitar duplicar intervals si ya estamos en main-screen (fix polling storm)
+  clearMainIntervals();
   document.getElementById("auth-screen").classList.remove("active");
   document.getElementById("main-screen").classList.add("active");
 
@@ -37,7 +49,7 @@ function showMainScreen(nick) {
   }
 
   PapuApi.sendHeartbeat(nick);
-  setInterval(() => PapuApi.sendHeartbeat(nick), 10000);
+  heartbeatInterval = setInterval(() => PapuApi.sendHeartbeat(nick), 10000);
 
   loadRecentChats();
   loadSocialData();
@@ -46,11 +58,32 @@ function showMainScreen(nick) {
   initGlobalMessageTracking();
 
   // Polling periódico para recibir solicitudes de amistad, estados y notificar mensajes nuevos en segundo plano
-  setInterval(() => {
-    loadSocialData();
-    checkBackgroundNewMessages();
-    if (document.getElementById("tab-content-chats").classList.contains("active")) {
-      loadRecentChats();
+  // Con guard anti-spam: si hay fallos consecutivos, hace backoff para no saturar ngrok
+  mainPollInterval = setInterval(async () => {
+    // Si la pestaña está oculta, reducir frecuencia a la mitad
+    if (document.hidden) return;
+    try {
+      await loadSocialData();
+      await checkBackgroundNewMessages();
+      if (document.getElementById("tab-content-chats").classList.contains("active")) {
+        await loadRecentChats();
+      }
+      consecutiveFailCount = 0;
+    } catch (e) {
+      consecutiveFailCount++;
+      // backoff exponencial: pausa extra tras 3 fallos seguidos
+      if (consecutiveFailCount >= 3) {
+        clearInterval(mainPollInterval);
+        const backoff = Math.min(15000, 3000 * Math.pow(2, consecutiveFailCount - 3));
+        console.warn(`[PapuWhats] Backoff ${backoff}ms tras ${consecutiveFailCount} fallos`);
+        setTimeout(() => {
+          if (document.getElementById("main-screen").classList.contains("active")) {
+            mainPollInterval = setInterval(async () => {
+              try { await loadSocialData(); await checkBackgroundNewMessages(); if (document.getElementById("tab-content-chats").classList.contains("active")) await loadRecentChats(); consecutiveFailCount=0; } catch(err){ consecutiveFailCount++; }
+            }, 3000);
+          }
+        }, backoff);
+      }
     }
   }, 3000);
 
@@ -572,6 +605,8 @@ async function handleAuthSubmit(e) {
 }
 
 function logout() {
+  clearMainIntervals();
+  if (typeof chatPollingInterval !== 'undefined' && chatPollingInterval) { clearInterval(chatPollingInterval); chatPollingInterval = null; }
   PapuApi.clearToken();
   localStorage.removeItem("papuwhats_nick");
   showAuthScreen();
