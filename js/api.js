@@ -1,7 +1,8 @@
 const API_BASE = "https://doozy-cosigner-sandstorm.ngrok-free.dev/api";
 const PAPUWHATS_BASE = "https://doozy-cosigner-sandstorm.ngrok-free.dev/papuwhats";
 
-// Ngrok bypass como query param (evita CORS preflight con header custom)
+// Ngrok bypass: enviamos BOTH header + query param para compatibilidad total
+// Header es obligatorio para Ngrok (evita pagina azul HTML 200), query param asegura bypass aun con CORS estricto
 function ngrokUrl(url) {
   return `${url}${url.includes("?") ? "&" : "?"}ngrok-skip-browser-warning=true`;
 }
@@ -23,7 +24,7 @@ const PapuApi = {
   },
 
   getHeaders() {
-    const headers = { "Content-Type": "application/json" };
+    const headers = { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" };
     const token = this.getToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
     return headers;
@@ -32,7 +33,7 @@ const PapuApi = {
   async login(nick, password) {
     const res = await fetch(ngrokUrl(`${API_BASE}/auth/login`), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
       body: JSON.stringify({ nick, password })
     });
     const data = await res.json();
@@ -48,7 +49,7 @@ const PapuApi = {
   async confirm2FA(tempToken, code) {
     const res = await fetch(ngrokUrl(`${API_BASE}/auth/2fa/confirm`), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
       body: JSON.stringify({ tempToken, code })
     });
     const data = await res.json();
@@ -60,7 +61,7 @@ const PapuApi = {
   async register(nick, password) {
     const res = await fetch(ngrokUrl(`${API_BASE}/auth/register`), {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
       body: JSON.stringify({ nick, password, hash: nick })
     });
     const data = await res.json();
