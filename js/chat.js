@@ -318,24 +318,38 @@ function renderMsgBubble(msg, isPartnerOnline, starredIds, reactionsMap, isNew) 
   let stickerSrc = text;
   if (text.startsWith("STICKER:")) stickerSrc = text.replace("STICKER:", "");
 
-  if (isSticker) {
+  // Validación estricta de URLs/Data-URIs para evitar inyecciones XSS en atributos HTML
+  const isSafeDataUri = (str, mimePrefix) => typeof str === "string" && str.startsWith(`data:${mimePrefix}`) && !str.includes('"') && !str.includes("'") && !str.includes("<") && !str.includes(">");
+  const isSafeHttpUrl = (str) => {
+    try {
+      const parsed = new URL(str);
+      return (parsed.protocol === "http:" || parsed.protocol === "https:") && !str.includes('"') && !str.includes("'") && !str.includes("<") && !str.includes(">");
+    } catch (e) {
+      return false;
+    }
+  };
+
+  if (isSticker && (isSafeDataUri(stickerSrc, "image/") || isSafeDataUri(stickerSrc, "sticker/") || isSafeHttpUrl(stickerSrc))) {
+    const safeSrc = encodeURI(stickerSrc).replace(/"/g, "&quot;");
     contentHtml = `
       <div class="sticker-msg-wrapper">
-        <img src="${stickerSrc}" class="msg-sticker" onclick="promptSaveSticker('${stickerSrc}')" title="Toca para guardar sticker">
+        <img src="${safeSrc}" class="msg-sticker" onclick="promptSaveSticker(this.src)" title="Toca para guardar sticker">
         <span class="sticker-save-hint">Toca para guardar</span>
       </div>
     `;
-  } else if (text.startsWith("data:image/") || (text.startsWith("http") && text.match(/\.(jpeg|jpg|gif|png|webp)$/i))) {
-    contentHtml = `<img src="${text}" class="msg-image" onclick="viewImage('${text}')">`;
-  } else if (text.startsWith("data:audio/")) {
+  } else if ((text.startsWith("data:image/") && isSafeDataUri(text, "image/")) || (text.startsWith("http") && isSafeHttpUrl(text) && text.match(/\.(jpeg|jpg|gif|png|webp)$/i))) {
+    const safeSrc = encodeURI(text).replace(/"/g, "&quot;");
+    contentHtml = `<img src="${safeSrc}" class="msg-image" onclick="viewImage(this.src)">`;
+  } else if (text.startsWith("data:audio/") && isSafeDataUri(text, "audio/")) {
+    const safeAudio = text.replace(/["'<>]/g, "");
     contentHtml = `
       <div class="custom-voice-player">
-        <button class="voice-play-btn" id="btn-play-${msgId}" onclick="playAudioBase64(this, '${msgId}')">${PLAY_SVG}</button>
+        <button class="voice-play-btn" id="btn-play-${escapeHtml(msgId)}" onclick="playAudioBase64(this, '${escapeHtml(msgId)}')">${PLAY_SVG}</button>
         <div class="voice-waveform">
-          <div class="voice-progress-bar" id="bar-${msgId}"></div>
+          <div class="voice-progress-bar" id="bar-${escapeHtml(msgId)}"></div>
         </div>
-        <button class="audio-speed-btn" onclick="toggleAudioSpeed(event, '${msgId}')" title="Cambiar velocidad">1x</button>
-        <input type="hidden" id="audio-data-${msgId}" value="${text}">
+        <button class="audio-speed-btn" onclick="toggleAudioSpeed(event, '${escapeHtml(msgId)}')" title="Cambiar velocidad">1x</button>
+        <input type="hidden" id="audio-data-${escapeHtml(msgId)}" value="${safeAudio}">
       </div>
     `;
   } else {
