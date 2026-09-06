@@ -39,28 +39,6 @@ const PapuApi = {
   },
 
   getHeaders() {
-  clearToken() {
-    localStorage.removeItem("papuwhats_jwt");
-    localStorage.removeItem("papubank_jwt");
-    localStorage.removeItem("papuwhats_user");
-  },
-
-  handleAuthFail() {
-    this.clearToken();
-    localStorage.removeItem("papuwhats_nick");
-    // Evitar spam: solo redirigir una vez
-    if (!window._authFailHandled) {
-      window._authFailHandled = true;
-      console.warn("[PapuApi] 401 Unauthorized -> sesion expirada, redirigiendo a login");
-      if (typeof showAuthScreen === "function") setTimeout(() => showAuthScreen(), 100);
-      else if (window.showAuthScreen) setTimeout(() => window.showAuthScreen(), 100);
-      // Limpiar intervalos para parar el bucle 401
-      if (typeof clearMainIntervals === "function") try{ clearMainIntervals(); }catch(e){}
-      if (typeof chatPollingInterval !== "undefined" && chatPollingInterval) { clearInterval(chatPollingInterval); chatPollingInterval = null; }
-    }
-  },
-
-  getHeaders() {
     const headers = { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" };
     const token = this.getToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
