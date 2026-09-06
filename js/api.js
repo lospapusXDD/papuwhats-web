@@ -55,7 +55,10 @@ const PapuApi = {
     if (!res.ok) {
       const msg = data.reason ? `${data.error || "Acceso denegado"}: ${data.reason}` : (data.error || "Error al iniciar sesión");
       const err = new Error(msg);
-      err.reason = data.reason;
+      err.title = data.title || "Cuenta Suspendida";
+      err.reason = data.reason || "Uso no autorizado de la plataforma";
+      err.expiresAt = data.expiresAt || null;
+      err.isPermanent = data.isPermanent !== false && !data.expiresAt;
       err.status = res.status;
       throw err;
     }
