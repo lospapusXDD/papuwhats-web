@@ -606,10 +606,10 @@ async function handleAuthSubmit(e) {
   } catch (err) {
     if (err.status === 403 || (err.message && (err.message.toLowerCase().includes("banead") || err.message.toLowerCase().includes("denegad") || err.message.toLowerCase().includes("suspendid")))) {
       const reason = err.reason || (err.message.includes(":") ? err.message.split(":")[1].trim() : err.message);
-      let durationStr = "Permanente 🚫";
+      let durationStr = "Permanente";
       if (!err.isPermanent && err.expiresAt) {
         try {
-          durationStr = "Expira: " + new Date(err.expiresAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' }) + " ⏳";
+          durationStr = "Expira: " + new Date(err.expiresAt).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
         } catch(e) {
           durationStr = "Temporal: " + err.expiresAt;
         }
@@ -622,7 +622,7 @@ async function handleAuthSubmit(e) {
   }
 }
 
-function showBanModal(reason = "Incumplimiento de las normas de la comunidad", duration = "Permanente 🚫") {
+function showBanModal(reason = "Incumplimiento de las normas de la comunidad", duration = "Permanente") {
   const modal = document.getElementById("modal-banned");
   if (!modal) return;
   const reasonEl = document.getElementById("ban-modal-reason");
