@@ -604,9 +604,34 @@ async function handleAuthSubmit(e) {
       window.AndroidNative.vibratePhone();
     }
   } catch (err) {
+    if (err.status === 403 || (err.message && (err.message.toLowerCase().includes("banead") || err.message.toLowerCase().includes("denegad")))) {
+      const reason = err.reason || (err.message.includes(":") ? err.message.split(":")[1].trim() : err.message);
+      showBanModal(reason, err.duration || "Permanente");
+      return;
+    }
     errorEl.textContent = err.message || "Error al iniciar sesión";
     errorEl.classList.remove("hidden");
   }
+}
+
+function showBanModal(reason = "Incumplimiento de las normas de la comunidad", duration = "Permanente") {
+  const modal = document.getElementById("modal-banned");
+  if (!modal) return;
+  const reasonEl = document.getElementById("ban-modal-reason");
+  const durationEl = document.getElementById("ban-modal-duration");
+  
+  if (reasonEl) reasonEl.textContent = reason;
+  if (durationEl) durationEl.textContent = duration;
+
+  modal.classList.remove("hidden");
+  if (window.AndroidNative && window.AndroidNative.vibratePhone) {
+    try { window.AndroidNative.vibratePhone(); } catch(e) {}
+  }
+}
+
+function closeBanModal() {
+  const modal = document.getElementById("modal-banned");
+  if (modal) modal.classList.add("hidden");
 }
 
 function logout() {
