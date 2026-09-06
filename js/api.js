@@ -39,6 +39,28 @@ const PapuApi = {
   },
 
   getHeaders() {
+  clearToken() {
+    localStorage.removeItem("papuwhats_jwt");
+    localStorage.removeItem("papubank_jwt");
+    localStorage.removeItem("papuwhats_user");
+  },
+
+  handleAuthFail() {
+    this.clearToken();
+    localStorage.removeItem("papuwhats_nick");
+    // Evitar spam: solo redirigir una vez
+    if (!window._authFailHandled) {
+      window._authFailHandled = true;
+      console.warn("[PapuApi] 401 Unauthorized -> sesion expirada, redirigiendo a login");
+      if (typeof showAuthScreen === "function") setTimeout(() => showAuthScreen(), 100);
+      else if (window.showAuthScreen) setTimeout(() => window.showAuthScreen(), 100);
+      // Limpiar intervalos para parar el bucle 401
+      if (typeof clearMainIntervals === "function") try{ clearMainIntervals(); }catch(e){}
+      if (typeof chatPollingInterval !== "undefined" && chatPollingInterval) { clearInterval(chatPollingInterval); chatPollingInterval = null; }
+    }
+  },
+
+  getHeaders() {
     const headers = { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" };
     const token = this.getToken();
     if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -52,7 +74,13 @@ const PapuApi = {
       body: JSON.stringify({ nick, password })
     });
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || "Error al iniciar sesion");
+    if (!res.ok) {
+      const msg = data.reason ? `${data.error || "Acceso denegado"}: ${data.reason}` : (data.error || "Error al iniciar sesión");
+      const err = new Error(msg);
+      err.reason = data.reason;
+      err.status = res.status;
+      throw err;
+    }
     if (data.twofaRequired || data.twofa_required) {
       return { twofaRequired: true, tempToken: data.tempToken || data.temp_token };
     }
