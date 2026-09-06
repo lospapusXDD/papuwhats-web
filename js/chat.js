@@ -24,11 +24,18 @@ function openChatRoom(targetNick) {
   document.getElementById("chat-target-nick").textContent = targetNick;
   
   const targetAvatarEl = document.getElementById("chat-target-avatar");
-  const customAvatar = localStorage.getItem(`avatar_${targetNick.toLowerCase()}`);
-  if (customAvatar) {
-    targetAvatarEl.innerHTML = `<img src="${customAvatar}" class="avatar-circle-img">`;
+  if (targetNick.includes("Soporte") || targetNick.includes("🛡️")) {
+    targetAvatarEl.innerHTML = `
+      <div style="width:100%; height:100%; border-radius:50%; background:linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); display:flex; align-items:center; justify-content:center; color:#fff;">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+      </div>`;
   } else {
-    targetAvatarEl.textContent = targetNick.charAt(0).toUpperCase();
+    const customAvatar = localStorage.getItem(`avatar_${targetNick.toLowerCase()}`);
+    if (customAvatar) {
+      targetAvatarEl.innerHTML = `<img src="${customAvatar}" class="avatar-circle-img">`;
+    } else {
+      targetAvatarEl.textContent = targetNick.charAt(0).toUpperCase();
+    }
   }
 
   // Cargar fondo personalizado si existe
@@ -100,6 +107,11 @@ function broadcastTyping(isTyping) {
 async function updateChatOnlineStatus(targetNick) {
   const statusEl = document.getElementById("chat-target-sub");
   if (!statusEl) return;
+
+  if (targetNick.includes("Soporte") || targetNick.includes("🛡️")) {
+    statusEl.innerHTML = `<span style="color:#f87171; font-weight:600;">Equipo de Moderación & Soporte</span>`;
+    return;
+  }
 
   const info = await PapuApi.getUserStatusInfo(targetNick);
   const myNick = (localStorage.getItem("papuwhats_nick") || "").toLowerCase();
@@ -407,8 +419,23 @@ async function loadChatMessages(forceScroll = false) {
       const fromIsAi = from.includes("papucore") || from.includes("ai") || from.includes("🤖") || from.includes("??");
       const toIsAi = to.includes("papucore") || to.includes("ai") || to.includes("🤖") || to.includes("??");
 
+      const isSoporteChat = partner.includes("soporte") || partner.includes("🛡️");
+      const fromIsSoporte = from.includes("soporte") || from.includes("🛡️");
+      const toIsSoporte = to.includes("soporte") || to.includes("🛡️");
+
+      const isStaffUser = myNick === "solariswat" || myNick === "said" || myNick === "admin" || myNick.includes("solaris") || myNick === "gabriel_admin";
+
       if (isAiChat) {
         return (from === myNick && toIsAi) || (fromIsAi && to === myNick) || (fromIsAi && to.includes("said")) || (from.includes("said") && toIsAi);
+      }
+
+      if (isSoporteChat) {
+        // Los admins/staff ven TODOS los mensajes enviados al canal de Soporte
+        if (isStaffUser) {
+          return toIsSoporte || fromIsSoporte;
+        }
+        // Los usuarios normales ven sus propios mensajes enviados a Soporte y las respuestas dirigidas a ellos
+        return (from === myNick && toIsSoporte) || (fromIsSoporte && to === myNick);
       }
 
       return (from === myNick && to === partner) || (from === partner && to === myNick);
@@ -428,7 +455,7 @@ async function loadChatMessages(forceScroll = false) {
 
     let isPartnerOnline = false;
     try {
-      if (activeChatPartner.includes("PapuCore") || activeChatPartner.includes("AI")) {
+      if (activeChatPartner.includes("PapuCore") || activeChatPartner.includes("AI") || activeChatPartner.includes("Soporte") || activeChatPartner.includes("🛡️")) {
         isPartnerOnline = true;
       } else {
         isPartnerOnline = await PapuApi.checkUserOnline(activeChatPartner);
@@ -788,7 +815,7 @@ async function loadRecentChats() {
   const chatsList = document.getElementById("chats-list");
   if (!chatsList) return;
 
-  const isDevUser = myNick === "solariswat" || myNick === "said" || myNick === "admin" || myNick.includes("solaris");
+  const isDevUser = myNick === "solariswat" || myNick === "said" || myNick === "admin" || myNick.includes("solaris") || myNick === "gabriel_admin";
   const devAiCardHtml = isDevUser ? `
     <div class="chat-item dev-ai-item" onclick="openChatRoom('🤖 PapuCore-AI')" style="border: 1px solid rgba(0, 240, 255, 0.35); background: linear-gradient(135deg, rgba(0, 240, 255, 0.08) 0%, rgba(168, 85, 247, 0.08) 100%);">
       <div class="avatar-circle" style="background: radial-gradient(circle, #00f0ff 0%, #a855f7 100%); color: #0a0b10; font-weight: 800; box-shadow: 0 0 12px rgba(0, 240, 255, 0.4);">AI</div>
@@ -801,6 +828,24 @@ async function loadRecentChats() {
       </div>
     </div>
   ` : "";
+
+  // Tarjeta de Canal de Soporte Técnico Oficial (Visible para todos los usuarios y para el Staff)
+  const soporteCardHtml = `
+    <div class="chat-item soporte-staff-item" onclick="openChatRoom('🛡️ Soporte Técnico')" style="border: 1px solid rgba(239, 68, 68, 0.3); background: linear-gradient(135deg, rgba(239, 68, 68, 0.07) 0%, rgba(30, 41, 59, 0.5) 100%); margin-bottom: 6px;">
+      <div class="avatar-circle" style="background: linear-gradient(135deg, #ef4444 0%, #b91c1c 100%); color: #ffffff; font-weight: 800; box-shadow: 0 0 10px rgba(239, 68, 68, 0.35);">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+        </svg>
+      </div>
+      <div class="chat-info">
+        <div class="chat-name-row">
+          <span class="chat-name" style="color: #f87171; font-weight: 700;">🛡️ Soporte Técnico</span>
+          <span class="badge" style="background: #ef4444; color: #ffffff; font-size: 9px; font-weight: 700;">STAFF / OFICIAL</span>
+        </div>
+        <div class="chat-last-msg" style="color: #94a3b8;">Canal de Ayuda, Reportes y Apelaciones con el Staff</div>
+      </div>
+    </div>
+  `;
 
   try {
     const allMessages = await PapuApi.fetchPrivateMessages();
@@ -831,11 +876,11 @@ async function loadRecentChats() {
     const partners = Object.keys(chatsMap);
 
     if (partners.length === 0) {
-      chatsList.innerHTML = devAiCardHtml + '<div class="empty-state">No tienes chats activos. Agrega un amigo para iniciar a chatear.</div>';
+      chatsList.innerHTML = devAiCardHtml + soporteCardHtml + '<div class="empty-state">No tienes chats activos. Agrega un amigo para iniciar a chatear.</div>';
       return;
     }
 
-    chatsList.innerHTML = devAiCardHtml + partners.filter(p => !p.includes("papucore") && !p.includes("ai") && !p.includes("🤖") && !p.includes("??")).map(partner => {
+    chatsList.innerHTML = devAiCardHtml + soporteCardHtml + partners.filter(p => !p.includes("papucore") && !p.includes("ai") && !p.includes("🤖") && !p.includes("??") && !p.includes("soporte") && !p.includes("🛡️")).map(partner => {
       const msg = chatsMap[partner];
       let text = msg.msg || msg.text || "";
       if (text.startsWith("data:audio/")) text = "🎤 Nota de voz";
