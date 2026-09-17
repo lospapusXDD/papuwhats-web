@@ -63,7 +63,12 @@ const PapuApi = {
       throw err;
     }
     if (data.twofaRequired || data.twofa_required) {
-      return { twofaRequired: true, tempToken: data.tempToken || data.temp_token };
+      return {
+        twofaRequired: true,
+        twofaType: data.twofaType || data.twofa_type || "email",
+        email: data.email || null,
+        tempToken: data.tempToken || data.temp_token
+      };
     }
     if (data.accessToken) this.setToken(data.accessToken);
     this.sendHeartbeat(nick);
@@ -82,11 +87,46 @@ const PapuApi = {
     return data;
   },
 
-  async register(nick, password) {
+  async resend2FACode(tempToken) {
+    const res = await fetch(ngrokUrl(`${API_BASE}/auth/2fa/resend`), {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
+      body: JSON.stringify({ tempToken })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al reenviar código");
+    return data;
+  },
+
+  async setup2FAEmail(email) {
+    const res = await fetch(ngrokUrl(`${API_BASE}/auth/2fa/email/setup`), {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify({ email })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Error al solicitar código al correo");
+    return data;
+  },
+
+  async verify2FAEmail(code) {
+    const res = await fetch(ngrokUrl(`${API_BASE}/auth/2fa/email/verify`), {
+      method: "POST",
+      headers: this.getHeaders(),
+      body: JSON.stringify({ code })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Código de verificación inválido");
+    return data;
+  },
+
+  async register(nick, password, email = null) {
+    const payload = { nick, password, hash: nick };
+    if (email) payload.email = email;
     const res = await fetch(ngrokUrl(`${API_BASE}/auth/register`), {
       method: "POST",
       headers: { "Content-Type": "application/json", "ngrok-skip-browser-warning": "true" },
-      body: JSON.stringify({ nick, password, hash: nick })
+      body: JSON.stringify(payload)
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Error al registrar usuario");

@@ -1,17 +1,27 @@
 // ═════════════════════════════════════════════════════════════════════════════
-// MOTOR DE ANIMACIÓN: ÓRBITA Y VUELO DE PARTÍCULAS / DÍGITOS OTP (6 DÍGITOS)
+// MOTOR DE VERIFICACIÓN OTP / 2FA (6 DÍGITOS REAL / CORREO)
 // ═════════════════════════════════════════════════════════════════════════════
 
-let currentOtpCode = "471928";
+let currentOtpCode = "";
 let otpParticles = [];
 let otpAnimRunning = false;
-let otpResendSeconds = 25;
+let otpResendSeconds = 60;
 let otpResendInterval = null;
+let activeTempToken = null;
 
-function showOtpVerificationModal(targetNick, code = "471928") {
-  currentOtpCode = String(code).padStart(6, "0").slice(0, 6);
-  document.getElementById("otp-target-user").textContent = `@${targetNick}`;
-  document.getElementById("sms-code-preview").textContent = `2FA: ${currentOtpCode} es tu código de verificación`;
+function showOtpVerificationModal(targetNick, maskedEmail = null, tempToken = null) {
+  activeTempToken = tempToken;
+  const targetEl = document.getElementById("otp-target-user");
+  if (targetEl) targetEl.textContent = `@${targetNick}`;
+  
+  const subtitleEl = document.getElementById("otp-subtitle-text");
+  if (subtitleEl) {
+    if (maskedEmail) {
+      subtitleEl.innerHTML = `Hemos enviado un código de 6 dígitos a tu correo <b style="color:var(--accent-green);">${maskedEmail}</b> (Válido por 10 min):`;
+    } else {
+      subtitleEl.textContent = `Hemos enviado un código de 6 dígitos a tu correo vinculado para @${targetNick} (Válido por 10 min):`;
+    }
+  }
   
   // Limpiar 6 slots
   for (let i = 0; i < 6; i++) {
@@ -22,72 +32,82 @@ function showOtpVerificationModal(targetNick, code = "471928") {
     }
   }
   const hiddenInput = document.getElementById("otp-hidden-input");
-  hiddenInput.value = "";
+  if (hiddenInput) {
+    hiddenInput.value = "";
+    setTimeout(() => hiddenInput.focus(), 150);
+  }
 
-  // Mostrar modal y toast SMS
+  // Mostrar modal y ocultar toast SMS falso
   const modal = document.getElementById("modal-otp-screen");
-  modal.classList.remove("hidden");
+  if (modal) modal.classList.remove("hidden");
 
   const smsToast = document.getElementById("sms-toast");
-  smsToast.classList.add("hidden");
+  if (smsToast) smsToast.classList.add("hidden");
 
   // Iniciar timer de reenvío
   startOtpResendTimer();
 
-  // El toast emergente entra tras 500ms
-  setTimeout(() => {
-    smsToast.classList.remove("hidden");
-  }, 500);
-
-  // Escuchar entrada de teclado manual (para Authy / Google Authenticator)
-  hiddenInput.focus();
-  hiddenInput.oninput = () => {
-    const val = hiddenInput.value.replace(/[^0-9]/g, "").slice(0, 6);
-    for (let i = 0; i < 6; i++) {
-      const slot = document.getElementById(`otp-slot-${i}`);
-      if (!slot) continue;
-      if (i < val.length) {
-        slot.textContent = val[i];
-        slot.classList.add("filled");
-      } else {
-        slot.textContent = "";
-        slot.classList.remove("filled");
+  // Escuchar entrada de teclado manual
+  if (hiddenInput) {
+    hiddenInput.oninput = () => {
+      const val = hiddenInput.value.replace(/[^0-9]/g, "").slice(0, 6);
+      for (let i = 0; i < 6; i++) {
+        const slot = document.getElementById(`otp-slot-${i}`);
+        if (!slot) continue;
+        if (i < val.length) {
+          slot.textContent = val[i];
+          slot.classList.add("filled");
+        } else {
+          slot.textContent = "";
+          slot.classList.remove("filled");
+        }
       }
-    }
-    if (val.length === 6) {
-      setTimeout(confirmOtpManual, 200);
-    }
-  };
+      if (val.length === 6) {
+        setTimeout(confirmOtpManual, 200);
+      }
+    };
+  }
 }
 
 function closeOtpScreen() {
-  document.getElementById("modal-otp-screen").classList.add("hidden");
-  document.getElementById("sms-toast").classList.add("hidden");
+  const modal = document.getElementById("modal-otp-screen");
+  if (modal) modal.classList.add("hidden");
+  const smsToast = document.getElementById("sms-toast");
+  if (smsToast) smsToast.classList.add("hidden");
   if (otpResendInterval) clearInterval(otpResendInterval);
   otpAnimRunning = false;
 }
 
 function startOtpResendTimer() {
   if (otpResendInterval) clearInterval(otpResendInterval);
-  otpResendSeconds = 25;
+  otpResendSeconds = 60;
   const timerText = document.getElementById("otp-timer-text");
+  if (!timerText) return;
   timerText.textContent = `Reenviar en ${otpResendSeconds}s`;
+  timerText.style.cursor = "default";
+  timerText.onclick = null;
 
   otpResendInterval = setInterval(() => {
     otpResendSeconds--;
     if (otpResendSeconds <= 0) {
       clearInterval(otpResendInterval);
-      timerText.textContent = "Reenviar Código";
-      timerText.onclick = () => {
-        const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-        showOtpVerificationModal(document.getElementById("otp-target-user").textContent.replace("@", ""), newCode);
+      timerText.textContent = "Reenviar Código al Correo";
+      timerText.style.cursor = "pointer";
+      timerText.onclick = async () => {
+        if (!activeTempToken) return;
+        timerText.textContent = "Reenviando...";
+        try {
+          await PapuApi.resend2FACode(activeTempToken);
+          startOtpResendTimer();
+        } catch (err) {
+          timerText.textContent = "Error al reenviar (Reintentar)";
+        }
       };
     } else {
       timerText.textContent = `Reenviar en ${otpResendSeconds}s`;
     }
   }, 1000);
 }
-
 // ─── Secuencia de Física de Órbita e Implosión en Canvas ───
 function triggerOtpOrbitAnimation() {
   const smsToast = document.getElementById("sms-toast");

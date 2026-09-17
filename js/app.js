@@ -53,6 +53,7 @@ function showMainScreen(nick) {
 
   loadRecentChats();
   loadSocialData();
+  loadUserSettingsEmail();
 
   // Inicializar mensajes existentes para que NO notifique mensajes viejos
   initGlobalMessageTracking();
@@ -548,6 +549,14 @@ function switchAuthTab(tab) {
   document.getElementById("tab-register").classList.toggle("active", tab === "register");
   document.getElementById("btn-auth-text").textContent = tab === "login" ? "Iniciar Sesión" : "Registrarse";
   document.getElementById("auth-error").classList.add("hidden");
+  const emailGroup = document.getElementById("group-email");
+  if (emailGroup) {
+    if (tab === "register") {
+      emailGroup.classList.remove("hidden");
+    } else {
+      emailGroup.classList.add("hidden");
+    }
+  }
 }
 
 let pendingTempToken = null;
@@ -557,6 +566,8 @@ async function handleAuthSubmit(e) {
   e.preventDefault();
   const nick = document.getElementById("input-nick").value.trim();
   const password = document.getElementById("input-password").value.trim();
+  const emailInput = document.getElementById("input-email");
+  const email = emailInput ? emailInput.value.trim() : null;
   const errorEl = document.getElementById("auth-error");
 
   if (!nick || !password) return;
@@ -578,24 +589,23 @@ async function handleAuthSubmit(e) {
             localStorage.setItem("papuwhats_nick", currentNickAttempt);
             showMainScreen(currentNickAttempt);
           } catch (err2fa) {
-            errorEl.textContent = "Código 2FA incorrecto: " + err2fa.message;
+            errorEl.textContent = "Código 2FA incorrecto o expirado: " + err2fa.message;
             errorEl.classList.remove("hidden");
-            // Reabrir modal en caso de fallo
             setTimeout(() => {
-              showOtpVerificationModal(nick, "1234");
+              showOtpVerificationModal(nick, res.email, pendingTempToken);
             }, 600);
           }
         };
 
-        // Mostrar la animación y modal OTP de 4 dígitos
-        showOtpVerificationModal(nick, "4719");
+        // Mostrar modal 2FA con el correo enmascarado del backend
+        showOtpVerificationModal(nick, res.email, pendingTempToken);
         return;
       }
 
       localStorage.setItem("papuwhats_nick", nick);
       showMainScreen(nick);
     } else {
-      await PapuApi.register(nick, password);
+      await PapuApi.register(nick, password, email || null);
       localStorage.setItem("papuwhats_nick", nick);
       showMainScreen(nick);
     }
@@ -691,5 +701,82 @@ async function handleWakeOnLanServer() {
     alert("🔌 " + (res.message || res.msg || "Paquete Wake-on-LAN enviado."));
   } catch (err) {
     alert(`🔌 Enviado Magic Packet a MAC ${mac} (${broadcastIp}). Asegúrate de estar conectado al mismo WiFi.`);
+  }
+}
+
+/* Manejo de Correo y 2FA desde Ajustes */
+async function loadUserSettingsEmail() {
+  const nick = localStorage.getItem("papuwhats_nick");
+  if (!nick) return;
+  try {
+    const profile = await PapuApi.getUserProfile(nick);
+    if (profile) {
+      const input = document.getElementById("settings-email-input");
+      if (input && profile.email) input.value = profile.email;
+      const btn2fa = document.getElementById("btn-enable-2fa-email");
+      const status = document.getElementById("settings-email-status");
+      if (profile.twofa_enabled) {
+        if (btn2fa) {
+          btn2fa.textContent = "✓ 2FA por Correo Activo";
+          btn2fa.style.background = "#059669";
+          btn2fa.disabled = true;
+        }
+        if (status) {
+          status.textContent = "Tu cuenta está blindada con Verificación en 2 Pasos por correo.";
+          status.style.color = "#10b981";
+          status.style.display = "block";
+        }
+      } else {
+        if (btn2fa) {
+          btn2fa.textContent = "Activar 2FA por Correo";
+          btn2fa.disabled = false;
+        }
+        if (status) {
+          status.textContent = "2FA desactivado. Vincula tu correo para activarlo.";
+          status.style.color = "#f59e0b";
+          status.style.display = "block";
+        }
+      }
+    }
+  } catch (e) {}
+}
+
+async function handleSaveEmailFromSettings() {
+  const nick = localStorage.getItem("papuwhats_nick");
+  const email = document.getElementById("settings-email-input").value.trim();
+  const status = document.getElementById("settings-email-status");
+  if (!email || !email.includes("@")) {
+    alert("Por favor ingresa un correo electrónico válido.");
+    return;
+  }
+  try {
+    await PapuApi.updateUser(nick, { email });
+    if (status) {
+      status.textContent = "✓ Correo guardado exitosamente.";
+      status.style.color = "#10b981";
+      status.style.display = "block";
+    }
+    alert("Correo actualizado con éxito.");
+  } catch (e) {
+    alert("Error al guardar correo: " + e.message);
+  }
+}
+
+async function handleSetup2FAEmailFlow() {
+  const nick = localStorage.getItem("papuwhats_nick");
+  const email = document.getElementById("settings-email-input").value.trim();
+  if (!email || !email.includes("@")) {
+    alert("Primero debes ingresar y guardar tu correo electrónico.");
+    return;
+  }
+  try {
+    await PapuApi.setup2FAEmail(email);
+    const code = prompt("Se ha enviado un código de 6 dígitos a " + email + ".\n\nIngresa el código para confirmar y activar 2FA:");
+    if (!code) return;
+    await PapuApi.verify2FAEmail(code.trim());
+    alert("🎉 ¡Verificación en 2 Pasos (2FA) por correo ACTIVADA con éxito!");
+    loadUserSettingsEmail();
+  } catch (e) {
+    alert("Error al activar 2FA: " + e.message);
   }
 }

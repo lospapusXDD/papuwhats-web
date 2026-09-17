@@ -43,6 +43,11 @@
             <input type="password" id="input-password" placeholder="Tu contraseña" required autocomplete="current-password">
           </div>
 
+          <div class="input-group hidden" id="group-email">
+            <label for="input-email">Correo Electrónico (Para 2FA y Seguridad)</label>
+            <input type="email" id="input-email" placeholder="ejemplo@gmail.com" autocomplete="email">
+          </div>
+
           <div id="auth-error" class="error-msg hidden"></div>
 
           <button type="submit" id="btn-auth-submit" class="primary-btn">
@@ -64,8 +69,8 @@
             <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
           </svg>
         </div>
-        <h2 class="otp-title">Verificación 2FA</h2>
-        <p class="otp-subtitle">Ingresa el código de 6 dígitos de tu autenticador (Authy / Google Auth) para <span id="otp-target-user" class="otp-highlight">@usuario</span></p>
+        <h2 class="otp-title">Verificación de Seguridad (2FA)</h2>
+        <p class="otp-subtitle" id="otp-subtitle-text">Hemos enviado un código de 6 dígitos al correo vinculado para <span id="otp-target-user" class="otp-highlight">@usuario</span></p>
 
         <!-- 6 Casillas de OTP para Authy -->
         <div class="otp-slots-container" id="otp-slots-container">
@@ -195,7 +200,30 @@
       </div>
 
       <!-- Tab 5: Ajustes / Configuración -->
-      <div id="tab-content-settings" class="tab-view">
+        <!-- Tab 5: Ajustes / Configuración -->
+        <div id="tab-content-settings" class="tab-view">
+          <!-- Sección de Seguridad y Correo 2FA -->
+          <div class="section-block">
+            <h3>🛡️ Seguridad & Verificación 2FA</h3>
+            <div class="settings-card">
+              <div style="font-size:13px; color:var(--text-secondary); margin-bottom:10px;">
+                Protege tu cuenta y tus fondos vinculando tu correo para recibir códigos de seguridad.
+              </div>
+              <div class="input-group" style="margin-bottom:10px;">
+                <label for="settings-email-input" style="font-size:12px; color:var(--text-secondary); margin-bottom:4px; display:block;">Correo Electrónico</label>
+                <div style="display:flex; gap:8px;">
+                  <input type="email" id="settings-email-input" placeholder="tu_correo@gmail.com" style="flex:1; padding:10px; background:var(--bg-panel); border:1px solid var(--border-color); border-radius:10px; color:#fff; font-size:13px;">
+                  <button class="primary-btn" id="btn-save-email" onclick="handleSaveEmailFromSettings()" style="padding:10px 14px; font-size:13px; white-space:nowrap;">Guardar</button>
+                </div>
+              </div>
+              <div id="settings-email-status" style="font-size:12px; font-weight:600; margin-bottom:10px; display:none;"></div>
+              <div class="settings-row" style="padding-top:10px; border-top:1px solid rgba(255,255,255,0.06);">
+                <button class="primary-btn" id="btn-enable-2fa-email" onclick="handleSetup2FAEmailFlow()" style="width:100%; background:linear-gradient(135deg, #10b981 0%, #059669 100%);">
+                  Activar 2FA por Correo
+                </button>
+              </div>
+            </div>
+          </div>
         <div class="section-block">
           <h3>Configuración de Cuenta</h3>
           <div class="settings-card">
