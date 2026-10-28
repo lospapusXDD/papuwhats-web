@@ -1,5 +1,5 @@
-const API_BASE = "https://doozy-cosigner-sandstorm.ngrok-free.dev/api";
-const PAPUWHATS_BASE = "https://doozy-cosigner-sandstorm.ngrok-free.dev/papuwhats";
+const API_BASE = "https://papusbank.serveousercontent.com/api";
+const PAPUWHATS_BASE = "https://papusbank.serveousercontent.com/papuwhats";
 
 // Ngrok bypass: enviamos BOTH header + query param para compatibilidad total
 // Header es obligatorio para Ngrok (evita pagina azul HTML 200), query param asegura bypass aun con CORS estricto
