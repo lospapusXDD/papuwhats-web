@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Bell, BellOff, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, Plus, ShieldCheck, Video, X } from "lucide-react";
+import { Bell, BellOff, Check, Copy, Download, Laptop, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, Plus, ShieldCheck, Smartphone, Terminal, Video, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatDuration, listTime } from "@/lib/papu/format";
 import { STORIES } from "@/lib/papu/seed";
@@ -244,6 +244,200 @@ export function Calls() {
   );
 }
 
+function InstallSection() {
+  const [selectedOs, setSelectedOs] = useState<"linux" | "windows" | "android" | "mac">("linux");
+  const [copied, setCopied] = useState(false);
+  const [installPrompt, setInstallPrompt] = useState<any>(null);
+  const [installed, setInstalled] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    window.addEventListener("beforeinstallprompt", handler);
+    window.addEventListener("appinstalled", () => setInstalled(true));
+    return () => {
+      window.removeEventListener("beforeinstallprompt", handler);
+    };
+  }, []);
+
+  const curlLinux = "curl -fsSL https://lospapusxdd.github.io/papuwhats-web/install.sh | bash";
+  const psWindows = "irm https://lospapusxdd.github.io/papuwhats-web/install.ps1 | iex";
+
+  const handleCopy = (cmd: string) => {
+    void navigator.clipboard.writeText(cmd);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const handlePwaInstall = async () => {
+    if (installPrompt) {
+      installPrompt.prompt();
+      const choice = await installPrompt.userChoice;
+      if (choice?.outcome === "accepted") {
+        setInstalled(true);
+      }
+      setInstallPrompt(null);
+    }
+  };
+
+  return (
+    <div className="rounded-3xl border border-line bg-ink p-4">
+      <div className="flex items-center gap-3">
+        <div className="flex size-10 items-center justify-center rounded-2xl bg-amber/20 text-amber">
+          <Terminal className="size-5" />
+        </div>
+        <div>
+          <h2 className="font-semibold text-bone">Instalar PapuWhats</h2>
+          <p className="text-xs text-mute">Comando curl de 1 clic para escritorio o app móvil</p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex gap-1.5 rounded-2xl bg-panel p-1">
+        {(["linux", "windows", "android", "mac"] as const).map((os) => (
+          <button
+            key={os}
+            type="button"
+            onClick={() => {
+              setSelectedOs(os);
+              setCopied(false);
+            }}
+            className={cn(
+              "flex-1 rounded-xl py-1.5 text-xs font-semibold capitalize transition-colors",
+              selectedOs === os ? "bg-amber text-ink" : "text-mute hover:text-bone"
+            )}
+          >
+            {os === "mac" ? "macOS" : os}
+          </button>
+        ))}
+      </div>
+
+      {selectedOs === "linux" && (
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-bone-dim">Pega este comando en tu terminal para instalar y crear el acceso directo:</p>
+          <div className="relative flex items-center rounded-xl border border-line bg-panel p-2.5 font-mono text-xs text-amber-dim">
+            <span className="truncate pr-8 select-all">{curlLinux}</span>
+            <button
+              type="button"
+              onClick={() => handleCopy(curlLinux)}
+              aria-label="Copiar comando"
+              className="absolute right-2 top-2 p-1 text-mute hover:text-bone"
+            >
+              {copied ? <Check className="size-4 text-moss" /> : <Copy className="size-4" />}
+            </button>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => handleCopy(curlLinux)}
+              className="flex h-9 flex-1 items-center justify-center gap-2 rounded-xl bg-amber px-3 text-xs font-semibold text-ink active:scale-[0.98]"
+            >
+              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              {copied ? "¡Comando copiado!" : "Copiar comando curl"}
+            </button>
+            <a
+              href="https://github.com/lospapusXDD/papuwhats-web/releases/download/v1.0.0/PapuWhats-1.0.0.AppImage"
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-9 items-center justify-center gap-1.5 rounded-xl border border-line px-3 text-xs font-semibold text-bone hover:border-amber"
+            >
+              <Download className="size-3.5" />
+              AppImage
+            </a>
+          </div>
+        </div>
+      )}
+
+      {selectedOs === "windows" && (
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-bone-dim">Ejecuta en PowerShell para descargar, extraer e iniciar en 1 clic:</p>
+          <div className="relative flex items-center rounded-xl border border-line bg-panel p-2.5 font-mono text-xs text-amber-dim">
+            <span className="truncate pr-8 select-all">{psWindows}</span>
+            <button
+              type="button"
+              onClick={() => handleCopy(psWindows)}
+              aria-label="Copiar comando"
+              className="absolute right-2 top-2 p-1 text-mute hover:text-bone"
+            >
+              {copied ? <Check className="size-4 text-moss" /> : <Copy className="size-4" />}
+            </button>
+          </div>
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => handleCopy(psWindows)}
+              className="flex h-9 flex-1 items-center justify-center gap-2 rounded-xl bg-amber px-3 text-xs font-semibold text-ink active:scale-[0.98]"
+            >
+              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              {copied ? "¡Comando copiado!" : "Copiar comando PowerShell"}
+            </button>
+            <a
+              href="https://github.com/lospapusXDD/papuwhats-web/releases/download/v1.0.0/PapuWhats-1.0.0-win.zip"
+              target="_blank"
+              rel="noreferrer"
+              className="flex h-9 items-center justify-center gap-1.5 rounded-xl border border-line px-3 text-xs font-semibold text-bone hover:border-amber"
+            >
+              <Download className="size-3.5" />
+              ZIP (exe)
+            </a>
+          </div>
+        </div>
+      )}
+
+      {selectedOs === "android" && (
+        <div className="mt-3 space-y-3">
+          <p className="text-xs text-bone-dim">Instala PapuWhats como aplicación nativa en tu móvil Android:</p>
+          {installPrompt ? (
+            <button
+              type="button"
+              onClick={handlePwaInstall}
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-amber text-xs font-semibold text-ink active:scale-[0.98]"
+            >
+              <Smartphone className="size-4" />
+              Instalar PapuWhats en Android
+            </button>
+          ) : installed ? (
+            <div className="rounded-xl border border-moss/40 bg-moss/10 p-3 text-xs text-moss">
+              ✓ ¡PapuWhats ya está instalada en tu dispositivo!
+            </div>
+          ) : (
+            <div className="rounded-xl border border-line bg-panel p-3 text-xs text-mute space-y-1.5">
+              <p className="font-semibold text-bone">Instrucciones para Chrome / Brave / Edge:</p>
+              <p>1. Toca en el menú de 3 puntos (⋮) en la esquina superior derecha.</p>
+              <p>
+                2. Selecciona <span className="font-semibold text-amber">"Instalar aplicación"</span> o{" "}
+                <span className="font-semibold text-amber">"Añadir a pantalla de inicio"</span>.
+              </p>
+              <p>3. ¡Listo! Se creará el acceso directo con icono oficial.</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {selectedOs === "mac" && (
+        <div className="mt-3 space-y-3 text-xs text-mute">
+          <p className="text-bone-dim">Para macOS puedes usar la versión web con todas las funciones o compilar con Electron:</p>
+          <div className="rounded-xl border border-line bg-panel p-2.5 font-mono text-amber-dim">
+            git clone https://github.com/lospapusXDD/papuwhats-web.git
+            <br />
+            cd papuwhats-web && npm install && npm run electron:build:mac
+          </div>
+          <a
+            href="https://github.com/lospapusXDD/papuwhats-web/releases/tag/v1.0.0"
+            target="_blank"
+            rel="noreferrer"
+            className="flex h-9 w-full items-center justify-center gap-2 rounded-xl border border-line text-xs font-semibold text-bone hover:border-amber"
+          >
+            <Download className="size-3.5" />
+            Ver Releases en GitHub
+          </a>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function Settings() {
   const { account, data } = useSession();
   const updateProfile = usePapu((s) => s.updateProfile);
@@ -317,6 +511,9 @@ export function Settings() {
             <p className="mt-1 text-sm text-pretty text-bone-dim">Activa en este acceso de ejemplo. El código se muestra en pantalla porque no hay un correo real detrás.</p>
           </div>
         </div>
+
+        <InstallSection />
+
         <button
           type="button"
           className="h-12 rounded-full border border-line text-sm font-semibold"
