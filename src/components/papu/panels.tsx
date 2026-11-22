@@ -71,9 +71,7 @@ export function Updates() {
     <div className="flex h-full min-h-0 flex-col bg-panel">
       <header className="px-5 pt-5 pb-3">
         <h1 className="font-display text-3xl">Novedades</h1>
-        <p className="mt-1 text-sm text-mute">
-          {isRealUser ? "Estados reales de tus contactos de PapusBank (24h)." : "Estados de ejemplo. El tuyo se guarda en este navegador."}
-        </p>
+        <p className="mt-1 text-sm text-mute">Estados de tus contactos de PapusBank (últimas 24 horas).</p>
       </header>
       <div className="flex gap-4 overflow-x-auto px-5 pb-4">
         <button type="button" className="w-20 shrink-0 text-center cursor-pointer" onClick={() => setDraft(data?.myStatus?.text ?? "")}>
@@ -208,7 +206,7 @@ export function Calls() {
     <div className="flex h-full min-h-0 flex-col bg-panel">
       <header className="px-5 pt-5 pb-3">
         <h1 className="font-display text-3xl">Llamadas</h1>
-        <p className="mt-1 text-sm text-mute">Historial de ejemplo. Toca una para devolverla.</p>
+        <p className="mt-1 text-sm text-mute">Registro de llamadas recientes. Toca una para devolverla.</p>
       </header>
       <ul className="min-h-0 flex-1 overflow-y-auto">
         {records.length === 0 ? <li className="px-5 py-8 text-sm text-mute">Todavía no hay llamadas.</li> : null}
@@ -507,31 +505,17 @@ export function Settings() {
         <div className="flex items-start gap-3 rounded-3xl border border-line bg-ink p-4">
           <ShieldCheck className="mt-0.5 size-5 shrink-0 text-amber" aria-hidden="true" />
           <div>
-            <p className="font-semibold">Verificación en dos pasos</p>
-            <p className="mt-1 text-sm text-pretty text-bone-dim">Activa en este acceso de ejemplo. El código se muestra en pantalla porque no hay un correo real detrás.</p>
+            <p className="font-semibold">Verificación en dos pasos (2FA)</p>
+            <p className="mt-1 text-sm text-pretty text-bone-dim">Protegida mediante código de autenticación y vinculada a tu cuenta de PapusBank.</p>
           </div>
         </div>
 
         <InstallSection />
 
-        <button
-          type="button"
-          className="h-12 rounded-full border border-line text-sm font-semibold"
-          onClick={() => {
-            if (!confirmReset) {
-              setConfirmReset(true);
-              return;
-            }
-            resetDemo();
-            setConfirmReset(false);
-          }}
-        >
-          {confirmReset ? "Confirmar restauración" : "Restaurar conversaciones de ejemplo"}
-        </button>
         <button type="button" className="h-12 rounded-full bg-clay text-sm font-semibold text-bone active:scale-[0.96]" onClick={logout}>
           Cerrar sesión
         </button>
-        <p className="pb-6 text-center text-xs text-mute">PapuWhats · demostración local</p>
+        <p className="pb-6 text-center text-xs text-mute">PapuWhats v1.0.0 · PapusBank Official Messenger</p>
       </div>
     </div>
   );

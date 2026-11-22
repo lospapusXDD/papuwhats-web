@@ -84,7 +84,7 @@ export function Thread() {
     return (
       <div className="thread-bg flex h-full flex-col items-center justify-center px-8 text-center">
         <p className="font-display text-4xl text-balance">PapuWhats</p>
-        <p className="mt-3 max-w-sm text-bone-dim">Elige una conversación. Los mensajes de ejemplo ya están en la bandeja.</p>
+        <p className="mt-3 max-w-sm text-bone-dim">Selecciona una conversación para comenzar a chatear o inicia una nueva con el botón +.</p>
       </div>
     );
   }
@@ -104,16 +104,19 @@ export function Thread() {
   async function startRecording() {
     unlockAudio();
     setNotice("");
-    if (typeof window !== "undefined" && !window.isSecureContext) {
-      setNotice("El micrófono requiere HTTPS o localhost en navegadores modernos.");
-      return;
-    }
-    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setNotice("Este navegador no admite grabación de audio directa.");
-      return;
-    }
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const getMedia =
+        navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices) ||
+        (navigator as any).getUserMedia?.bind(navigator) ||
+        (navigator as any).webkitGetUserMedia?.bind(navigator) ||
+        (navigator as any).mozGetUserMedia?.bind(navigator);
+
+      if (!getMedia || typeof MediaRecorder === "undefined") {
+        setNotice("Este dispositivo no admite grabación de audio.");
+        return;
+      }
+
+      const stream: MediaStream = await getMedia({ audio: true });
       let mimeType: string | undefined = undefined;
       if (typeof MediaRecorder.isTypeSupported === "function") {
         if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) mimeType = "audio/webm;codecs=opus";

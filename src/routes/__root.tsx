@@ -11,7 +11,7 @@ export const Route = createRootRoute({
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: APP_NAME },
-      { name: "description", content: "PapuWhats, mensajería de demostración con verificación en dos pasos, voz y llamadas." },
+      { name: "description", content: "PapuWhats, mensajería oficial de PapusBank con llamadas seguras, notas de voz y estados." },
       { name: "theme-color", content: "#0C0B09" },
     ],
     links: [

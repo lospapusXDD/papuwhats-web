@@ -9,7 +9,7 @@ import { Logo } from "@/components/papu/logo";
 
 const features = [
   { icon: ShieldCheck, title: "Dos pasos", text: "Clave y un código de seis dígitos antes de entrar." },
-  { icon: Mic, title: "Voz y llamadas", text: "Notas de voz, tono de envío y una llamada de ejemplo." },
+  { icon: Mic, title: "Voz y llamadas", text: "Notas de voz en vivo, llamadas seguras y videollamadas." },
   { icon: Smartphone, title: "Cualquier pantalla", text: "El mismo producto en el teléfono, la tablet y el escritorio." },
 ];
 
@@ -195,7 +195,7 @@ export function AuthScreen() {
             </div>
             <h1 className="mt-8 font-display text-6xl leading-none text-balance">Mensajes con calma.</h1>
             <p className="mt-5 max-w-md text-lg text-pretty text-bone-dim">
-              Una bandeja de ejemplo para probar el acceso, el código y la conversación antes de pasarla a producción.
+              La plataforma oficial de mensajería privada, llamadas y notas de voz para la comunidad de PapusBank.
             </p>
             <ul className="mt-10 space-y-5">
               {features.map((item, index) => (
@@ -347,24 +347,6 @@ export function AuthScreen() {
                       {mode === "login" ? "Continuar" : "Crear y verificar"}
                     </button>
                   </form>
-
-                  <div className="mt-6 rounded-2xl border border-line bg-ink/70 p-4">
-                    <p className="text-xs font-semibold tracking-wide text-amber uppercase">Cuenta de ejemplo</p>
-                    <p className="mt-2 text-sm text-bone">{DEMO_EMAIL}</p>
-                    <p className="text-sm text-bone-dim">{DEMO_PASSWORD}</p>
-                    <button
-                      type="button"
-                      className="mt-3 h-10 rounded-full border border-line px-4 text-sm font-semibold text-bone transition duration-150 hover:border-amber hover:shadow-[0_0_18px_color-mix(in_oklab,var(--color-amber)_40%,transparent)] active:scale-[0.96]"
-                      onClick={() => {
-                        setMode("login");
-                        setEmail(DEMO_EMAIL);
-                        setPassword(DEMO_PASSWORD);
-                        setError("");
-                      }}
-                    >
-                      Rellenar
-                    </button>
-                  </div>
                 </motion.div>
               ) : (
                 <motion.div
@@ -443,44 +425,12 @@ export function AuthScreen() {
 
                   {error ? <p className="mt-4 text-sm text-clay-bright">{error}</p> : null}
 
-                  {pending.tempToken ? (
-                    <div className="mt-6 rounded-2xl border border-dashed border-amber/40 bg-ink/80 p-4">
-                      <p className="text-xs font-semibold tracking-wide text-amber uppercase">Verificación 2FA de PapusBank</p>
-                      <p className="mt-2 text-sm text-pretty text-bone-dim">
-                        Ingresa el código de 6 dígitos enviado a tu correo o desde tu aplicación de autenticación TOTP.
-                      </p>
-                    </div>
-                  ) : (
-                    <div className="mt-6 rounded-2xl border border-dashed border-amber/40 bg-ink/80 p-4">
-                      <p className="text-xs font-semibold tracking-wide text-mute uppercase">Código de demostración</p>
-                      <AnimatePresence mode="wait" initial={false}>
-                        <motion.p
-                          key={pending.code}
-                          className="mt-2 font-display text-3xl tracking-widest text-amber tabular-nums"
-                          initial={{ opacity: 0, y: 8, filter: "blur(4px)" }}
-                          animate={{ opacity: 1, y: 0, filter: "blur(0px)" }}
-                          exit={{ opacity: 0, y: -8, filter: "blur(4px)" }}
-                          transition={{ duration: 0.22 }}
-                        >
-                          {pending.code}
-                        </motion.p>
-                      </AnimatePresence>
-                      <p className="mt-2 text-sm text-pretty text-bone-dim">
-                        En producción llegaría a tu correo. Aquí se muestra para poder completar el paso.
-                      </p>
-                      <button
-                        type="button"
-                        className="mt-3 text-sm font-semibold text-amber"
-                        onClick={() => {
-                          setDigits(pending.code.split(""));
-                          setError("");
-                          refs.current[5]?.focus();
-                        }}
-                      >
-                        Usar este código
-                      </button>
-                    </div>
-                  )}
+                  <div className="mt-6 rounded-2xl border border-dashed border-amber/40 bg-ink/80 p-4">
+                    <p className="text-xs font-semibold tracking-wide text-amber uppercase">Verificación en dos pasos (2FA)</p>
+                    <p className="mt-2 text-sm text-pretty text-bone-dim">
+                      Ingresa el código de 6 dígitos generado por tu aplicación autenticadora o enviado por PapusBank.
+                    </p>
+                  </div>
 
                   <button
                     type="button"
