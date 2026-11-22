@@ -1,5 +1,12 @@
 {
-  "name": "app-builder-workspace",
+  "name": "papuwhats",
+  "version": "1.0.0",
+  "description": "PapuWhats Desktop Messenger",
+  "homepage": "https://lospapusxdd.github.io/papuwhats-web/",
+  "author": {
+    "name": "Los Papus",
+    "email": "contact@lospapus.com"
+  },
   "private": true,
   "sideEffects": false,
   "type": "module",
@@ -7,9 +14,12 @@
     "nf3": "0.3.17"
   },
   "scripts": {
-    "dev": "vite dev --host 0.0.0.0 --port 8080",
-    "build": "vite build --config vite.static.config.ts",
-    "build:pages": "vite build --config vite.static.config.ts",
+    "electron:build:linux": "electron-builder --linux",
+    "electron:build:win": "electron-builder --win",
+    "electron:build:mac": "electron-builder --mac",
+    "electron:build:all": "electron-builder -mwl",
+    "dev": "node scripts/with-app-env.mjs vite dev --host 0.0.0.0 --port 8080",
+    "build": "node scripts/with-app-env.mjs vite build && npm run db:migrate",
     "db:migrate": "node scripts/migrate.mjs",
     "build:dev": "node scripts/with-app-env.mjs vite build --mode development",
     "preview": "node scripts/with-app-env.mjs vite preview",
@@ -88,6 +98,8 @@
     "@types/pg": "^8.11.10",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
+    "electron": "^45.4.1",
+    "electron-builder": "^26.18.0",
     "eslint": "^9.20.0",
     "eslint-config-prettier": "^10.1.1",
     "eslint-plugin-prettier": "^5.2.6",

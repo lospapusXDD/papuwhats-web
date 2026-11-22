@@ -1,0 +1,38 @@
+{
+  "appId": "com.lospapus.papuwhats",
+  "productName": "PapuWhats",
+  "directories": {
+    "output": "dist-electron"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "package.json"
+  ],
+  "extraMetadata": {
+    "main": "electron/main.cjs"
+  },
+  "linux": {
+    "target": ["AppImage", "deb"],
+    "category": "Network;Chat;InstantMessaging;",
+    "icon": "build/icon.png",
+    "synopsis": "PapuWhats Desktop Messenger",
+    "description": "Cliente oficial de escritorio para PapuWhats y PapusBank"
+  },
+  "win": {
+    "target": ["nsis", "portable"],
+    "icon": "build/icon.ico"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "PapuWhats"
+  },
+  "mac": {
+    "target": ["dmg", "zip"],
+    "category": "public.app-category.social-networking",
+    "icon": "build/icon.png"
+  }
+}
