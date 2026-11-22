@@ -62,15 +62,90 @@ export function AuthScreen() {
   }
 
   function applyDigits(start: number, raw: string) {
-    const chars = raw.replace(/\D/g, "").slice(0, 6 - start).split("");
-    if (!chars.length) return;
-    const next = digits.slice();
-    chars.forEach((ch, index) => {
-      next[start + index] = ch;
+    const clean = raw.replace(/\D/g, "");
+    const next = [...digits];
+
+    if (!clean) {
+      next[start] = "";
+      setDigits(next);
+      return;
+    }
+
+    if (clean.length > 1) {
+      if (clean.length === 2 && digits[start]) {
+        const newest = clean[clean.length - 1];
+        next[start] = newest;
+        setDigits(next);
+        if (start < 5) refs.current[start + 1]?.focus();
+        if (next.every(Boolean) && next.join("").length === 6) {
+          void submitCode(next.join(""));
+        }
+        return;
+      }
+
+      const chars = clean.slice(0, 6 - start).split("");
+      chars.forEach((ch, idx) => {
+        next[start + idx] = ch;
+      });
+      setDigits(next);
+      const focusAt = Math.min(5, start + chars.length);
+      refs.current[focusAt]?.focus();
+      if (next.every(Boolean) && next.join("").length === 6) {
+        void submitCode(next.join(""));
+      }
+      return;
+    }
+
+    next[start] = clean;
+    setDigits(next);
+    if (start < 5) {
+      refs.current[start + 1]?.focus();
+    }
+    if (next.every(Boolean) && next.join("").length === 6) {
+      void submitCode(next.join(""));
+    }
+  }
+
+  function handleKeyDown(index: number, event: React.KeyboardEvent<HTMLInputElement>) {
+    if (event.key === "Backspace") {
+      event.preventDefault();
+      const next = [...digits];
+      if (digits[index]) {
+        next[index] = "";
+        setDigits(next);
+      } else if (index > 0) {
+        next[index - 1] = "";
+        setDigits(next);
+        refs.current[index - 1]?.focus();
+      }
+    } else if (event.key === "Delete") {
+      event.preventDefault();
+      const next = [...digits];
+      next[index] = "";
+      setDigits(next);
+    } else if (event.key === "ArrowLeft" && index > 0) {
+      refs.current[index - 1]?.focus();
+    } else if (event.key === "ArrowRight" && index < 5) {
+      refs.current[index + 1]?.focus();
+    } else if (event.key === "Enter") {
+      submitCode();
+    }
+  }
+
+  function handlePaste(event: React.ClipboardEvent) {
+    event.preventDefault();
+    const pasted = event.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (!pasted) return;
+    const next = ["", "", "", "", "", ""];
+    pasted.split("").forEach((ch, i) => {
+      if (i < 6) next[i] = ch;
     });
     setDigits(next);
-    const focusAt = Math.min(5, start + chars.length);
+    const focusAt = Math.min(5, pasted.length);
     refs.current[focusAt]?.focus();
+    if (pasted.length === 6) {
+      void submitCode(pasted);
+    }
   }
 
   async function submitCode(raw?: string) {
@@ -341,15 +416,30 @@ export function AuthScreen() {
                           value={digit}
                           disabled={done}
                           onChange={(event) => applyDigits(index, event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Backspace" && !digits[index] && index > 0) refs.current[index - 1]?.focus();
-                            if (event.key === "Enter") submitCode();
-                          }}
+                          onKeyDown={(event) => handleKeyDown(index, event)}
+                          onPaste={handlePaste}
+                          onFocus={(event) => event.target.select()}
+                          onClick={(event) => (event.target as HTMLInputElement).select()}
                           className="h-14 w-full rounded-xl border border-line bg-ink text-center text-2xl font-semibold text-bone tabular-nums shadow-[inset_0_0_0_1px_transparent] outline-none transition-[border-color,box-shadow] duration-200 focus:border-amber focus:shadow-[0_0_18px_color-mix(in_oklab,var(--color-amber)_45%,transparent)]"
                         />
                       </motion.div>
                     ))}
                   </div>
+
+                  {digits.some(Boolean) && !done && (
+                    <div className="mt-3 flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDigits(["", "", "", "", "", ""]);
+                          refs.current[0]?.focus();
+                        }}
+                        className="text-xs text-mute underline-offset-4 hover:text-amber hover:underline"
+                      >
+                        Limpiar código
+                      </button>
+                    </div>
+                  )}
 
                   {error ? <p className="mt-4 text-sm text-clay-bright">{error}</p> : null}
 
