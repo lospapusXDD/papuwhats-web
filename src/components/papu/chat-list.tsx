@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
-import { BellOff, Check, CheckCheck, Pin, Search } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { BellOff, Check, CheckCheck, Loader2, MessageSquare, Pin, Search, UserCheck, UserPlus, UserX, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { lastMessage, listTime, previewText, unreadCount } from "@/lib/papu/format";
 import { usePapu } from "@/lib/papu/store";
+import { PapuApi } from "@/lib/papu/api";
 import type { Chat } from "@/lib/papu/types";
 import { Avatar } from "@/components/papu/avatar";
 
@@ -20,6 +21,7 @@ export function ChatList() {
   const account = usePapu((s) => s.accounts.find((item) => item.id === sessionUserId));
   const [query, setQuery] = useState("");
   const [chip, setChip] = useState<(typeof chips)[number]["id"]>("all");
+  const [modalOpen, setModalOpen] = useState(false);
 
   const chats = useMemo(() => {
     const list = data?.chats ?? [];
@@ -46,6 +48,14 @@ export function ChatList() {
             <p className="font-display text-2xl">Chats</p>
             <p className="text-sm text-mute">{account?.name}</p>
           </div>
+          <button
+            type="button"
+            onClick={() => setModalOpen(true)}
+            title="Añadir contacto / Nuevo chat"
+            className="inline-flex size-10 items-center justify-center rounded-full bg-amber text-ink transition-transform hover:scale-105 active:scale-95 shadow-md"
+          >
+            <UserPlus className="size-5" />
+          </button>
         </div>
         <label className="mt-4 flex h-11 items-center gap-2 rounded-full border border-line bg-ink px-4">
           <Search className="size-4 text-mute" aria-hidden="true" />
@@ -75,18 +85,31 @@ export function ChatList() {
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto">
         {chats.length === 0 ? (
-          <p className="px-5 py-10 text-sm text-mute">Nada coincide con esa búsqueda.</p>
+          <div className="flex flex-col items-center justify-center px-6 py-12 text-center text-mute">
+            <p className="text-base font-medium text-bone-dim">No hay chats aún</p>
+            <p className="mt-1 text-xs">Usa el botón de arriba (+) para añadir contactos o iniciar una conversación.</p>
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="mt-4 inline-flex items-center gap-2 rounded-full bg-amber/15 px-4 py-2 text-xs font-semibold text-amber hover:bg-amber/25 transition cursor-pointer"
+            >
+              <UserPlus className="size-4" />
+              Añadir contacto
+            </button>
+          </div>
         ) : (
-          chats.map((chat, index) => (
-            <ChatRow key={chat.id} chat={chat} index={index} active={chat.id === activeChatId} onOpen={() => openChat(chat.id)} />
+          chats.map((chat) => (
+            <ChatRow key={chat.id} chat={chat} active={chat.id === activeChatId} onOpen={() => openChat(chat.id)} />
           ))
         )}
       </div>
+
+      {modalOpen ? <AddContactModal onClose={() => setModalOpen(false)} onSelect={(nick) => openChat(nick)} /> : null}
     </div>
   );
 }
 
-function ChatRow({ chat, index, active, onOpen }: { chat: Chat; index: number; active: boolean; onOpen: () => void }) {
+function ChatRow({ chat, active, onOpen }: { chat: Chat; active: boolean; onOpen: () => void }) {
   const last = lastMessage(chat);
   const unread = unreadCount(chat);
   return (
@@ -94,10 +117,9 @@ function ChatRow({ chat, index, active, onOpen }: { chat: Chat; index: number; a
       type="button"
       onClick={onOpen}
       className={cn(
-        "row-in flex w-full items-center gap-3 border-b border-line px-4 py-3 text-left transition-colors duration-150",
+        "flex w-full items-center gap-3 border-b border-line px-4 py-3 text-left transition-colors duration-150 cursor-pointer",
         active ? "bg-ink" : "hover:bg-panel-2",
       )}
-      style={{ animationDelay: `${index * 45}ms` }}
     >
       <Avatar name={chat.title} tone={chat.tone} online={chat.presence === "online"} />
       <span className="min-w-0 flex-1">
@@ -130,5 +152,193 @@ function ChatRow({ chat, index, active, onOpen }: { chat: Chat; index: number; a
         </span>
       </span>
     </button>
+  );
+}
+
+function AddContactModal({ onClose, onSelect }: { onClose: () => void; onSelect: (nick: string) => void }) {
+  const [targetNick, setTargetNick] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [feedback, setFeedback] = useState<{ text: string; error?: boolean } | null>(null);
+  const [friendsData, setFriendsData] = useState<{ friends: any[]; incoming: any[] }>({ friends: [], incoming: [] });
+  const syncFromApi = usePapu((s) => s.syncFromApi);
+
+  async function loadFriends() {
+    const res = await PapuApi.getFriends();
+    setFriendsData({ friends: res.friends || [], incoming: res.incoming || [] });
+  }
+
+  useEffect(() => {
+    void loadFriends();
+  }, []);
+
+  async function handleOpenDirectChat() {
+    const clean = targetNick.trim();
+    if (!clean) return;
+    setLoading(true);
+    setFeedback(null);
+    try {
+      onSelect(clean);
+      void PapuApi.sendFriendRequest(clean);
+      void syncFromApi();
+      onClose();
+    } catch (err: any) {
+      setFeedback({ text: err?.message || "Error al abrir chat", error: true });
+      setLoading(false);
+    }
+  }
+
+  async function handleSendRequest() {
+    const clean = targetNick.trim();
+    if (!clean) return;
+    setLoading(true);
+    setFeedback(null);
+    const res = await PapuApi.sendFriendRequest(clean);
+    setLoading(false);
+    if (!res.ok) {
+      setFeedback({ text: res.error || "No se pudo enviar la solicitud", error: true });
+    } else {
+      setFeedback({ text: res.message || `Solicitud enviada a ${clean}` });
+      setTargetNick("");
+      void loadFriends();
+    }
+  }
+
+  async function handleAccept(fromNick: string) {
+    const res = await PapuApi.acceptFriendRequest(fromNick);
+    if (res.ok) {
+      void loadFriends();
+      void syncFromApi();
+      onSelect(fromNick);
+      onClose();
+    }
+  }
+
+  async function handleReject(fromNick: string) {
+    const res = await PapuApi.rejectFriendRequest(fromNick);
+    if (res.ok) {
+      void loadFriends();
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/80 p-4 backdrop-blur-xs">
+      <div className="w-full max-w-md rounded-3xl border border-line bg-panel p-6 shadow-2xl">
+        <div className="flex items-center justify-between border-b border-line pb-3">
+          <div className="flex items-center gap-2">
+            <UserPlus className="size-5 text-amber" />
+            <h2 className="font-display text-xl">Añadir Contacto / Chat</h2>
+          </div>
+          <button type="button" onClick={onClose} className="rounded-full p-1.5 text-mute hover:bg-panel-2 hover:text-bone cursor-pointer">
+            <X className="size-5" />
+          </button>
+        </div>
+
+        <div className="mt-4">
+          <label htmlFor="nick-input" className="block text-xs font-semibold uppercase tracking-wider text-mute">
+            Nick de PapusBank
+          </label>
+          <div className="mt-1 flex gap-2">
+            <input
+              id="nick-input"
+              type="text"
+              value={targetNick}
+              onChange={(e) => setTargetNick(e.target.value)}
+              placeholder="Ej: pepito"
+              className="flex-1 rounded-2xl border border-line bg-ink px-4 py-2.5 text-sm text-bone outline-none focus:border-amber"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void handleOpenDirectChat();
+              }}
+            />
+            <button
+              type="button"
+              disabled={loading || !targetNick.trim()}
+              onClick={() => void handleOpenDirectChat()}
+              className="rounded-2xl bg-amber px-4 py-2.5 text-sm font-semibold text-ink transition hover:opacity-90 disabled:opacity-50 cursor-pointer"
+            >
+              {loading ? <Loader2 className="size-4 animate-spin" /> : "Chatear"}
+            </button>
+          </div>
+
+          <div className="mt-2 flex justify-end">
+            <button
+              type="button"
+              disabled={loading || !targetNick.trim()}
+              onClick={() => void handleSendRequest()}
+              className="text-xs text-amber hover:underline disabled:opacity-50 cursor-pointer"
+            >
+              + Enviar solo solicitud de amistad
+            </button>
+          </div>
+
+          {feedback ? (
+            <p className={cn("mt-2 text-xs", feedback.error ? "text-clay-bright" : "text-amber")}>
+              {feedback.text}
+            </p>
+          ) : null}
+        </div>
+
+        {/* Solicitudes de amistad entrantes */}
+        {friendsData.incoming.length > 0 ? (
+          <div className="mt-5 border-t border-line pt-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-amber">
+              Solicitudes Recibidas ({friendsData.incoming.length})
+            </p>
+            <div className="mt-2 max-h-36 space-y-2 overflow-y-auto">
+              {friendsData.incoming.map((req) => (
+                <div key={req.id} className="flex items-center justify-between rounded-xl bg-ink p-2.5">
+                  <span className="font-medium text-sm text-bone">{req.from_nick}</span>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => void handleAccept(req.from_nick)}
+                      title="Aceptar"
+                      className="rounded-lg bg-moss px-2.5 py-1 text-xs font-semibold text-bone hover:opacity-90 flex items-center gap-1 cursor-pointer"
+                    >
+                      <UserCheck className="size-3.5" />
+                      Aceptar
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => void handleReject(req.from_nick)}
+                      title="Rechazar"
+                      className="rounded-lg bg-clay px-2.5 py-1 text-xs font-semibold text-bone hover:opacity-90 flex items-center gap-1 cursor-pointer"
+                    >
+                      <UserX className="size-3.5" />
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Amigos ya registrados */}
+        {friendsData.friends.length > 0 ? (
+          <div className="mt-5 border-t border-line pt-3">
+            <p className="text-xs font-semibold uppercase tracking-wider text-mute">
+              Mis Amigos ({friendsData.friends.length})
+            </p>
+            <div className="mt-2 max-h-36 space-y-1.5 overflow-y-auto">
+              {friendsData.friends.map((f) => (
+                <div key={f.friend_nick} className="flex items-center justify-between rounded-xl p-2 hover:bg-ink">
+                  <span className="font-medium text-sm text-bone">{f.friend_nick}</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSelect(f.friend_nick);
+                      onClose();
+                    }}
+                    className="inline-flex items-center gap-1 rounded-lg bg-amber/20 px-2.5 py-1 text-xs font-medium text-amber hover:bg-amber/30 cursor-pointer"
+                  >
+                    <MessageSquare className="size-3.5" />
+                    Abrir Chat
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+      </div>
+    </div>
   );
 }

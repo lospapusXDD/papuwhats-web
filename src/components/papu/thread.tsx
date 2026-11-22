@@ -104,14 +104,24 @@ export function Thread() {
   async function startRecording() {
     unlockAudio();
     setNotice("");
+    if (typeof window !== "undefined" && !window.isSecureContext) {
+      setNotice("El micrófono requiere HTTPS o localhost en navegadores modernos.");
+      return;
+    }
     if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === "undefined") {
-      setNotice("Este navegador no abre el micrófono.");
+      setNotice("Este navegador no admite grabación de audio directa.");
       return;
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mime = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
-      const media = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+      let mimeType: string | undefined = undefined;
+      if (typeof MediaRecorder.isTypeSupported === "function") {
+        if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) mimeType = "audio/webm;codecs=opus";
+        else if (MediaRecorder.isTypeSupported("audio/webm")) mimeType = "audio/webm";
+        else if (MediaRecorder.isTypeSupported("audio/mp4")) mimeType = "audio/mp4";
+        else if (MediaRecorder.isTypeSupported("audio/ogg")) mimeType = "audio/ogg";
+      }
+      const media = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       const chunks: Blob[] = [];
       media.ondataavailable = (event) => {
         if (event.data.size) chunks.push(event.data);
@@ -142,8 +152,15 @@ export function Thread() {
       window.setTimeout(() => {
         if (Date.now() - startedAt.current > 59000) void finishRecording();
       }, 60000);
-    } catch {
-      setNotice("Permiso de micrófono denegado.");
+    } catch (err: any) {
+      console.warn("[Mic] Error accediendo al micrófono:", err);
+      if (err?.name === "NotAllowedError" || err?.name === "PermissionDeniedError") {
+        setNotice("Permiso denegado: haz clic en el candado 🔒 de tu navegador y permite el micrófono.");
+      } else if (err?.name === "NotFoundError" || err?.name === "DevicesNotFoundError") {
+        setNotice("No se detectó ningún micrófono conectado a tu equipo.");
+      } else {
+        setNotice("Error de micrófono: " + (err?.message || "comprueba los permisos del navegador"));
+      }
     }
   }
 
@@ -166,7 +183,8 @@ export function Thread() {
 
   return (
     <div
-      className="flex h-full min-h-0 flex-col"
+      key={chat.id}
+      className="animate-thread-in flex h-full min-h-0 flex-col"
       onDragOver={(event) => event.preventDefault()}
       onDrop={(event) => {
         event.preventDefault();
@@ -380,7 +398,7 @@ function Bubble({
   onZoom: (src: string) => void;
 }) {
   return (
-    <div className={cn("bubble-in flex", mine ? "justify-end" : "justify-start")}>
+    <div className={cn("flex transition-opacity duration-150", mine ? "justify-end" : "justify-start")}>
       <div
         role="button"
         tabIndex={0}

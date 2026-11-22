@@ -398,18 +398,37 @@ export const usePapu = create<PapuState>()(
 
       openChat: (id) => {
         const now = Date.now();
-        patchUser(set, get, (data) => ({
-          ...data,
-          chats: data.chats.map((c) =>
-            c.id !== id
-              ? c
-              : {
-                  ...c,
+        patchUser(set, get, (data) => {
+          const exists = data.chats.some((c) => c.id === id);
+          const tone = nickToTone(id);
+          const chats = exists
+            ? data.chats.map((c) =>
+                c.id !== id
+                  ? c
+                  : {
+                      ...c,
+                      lastReadAt: now,
+                      messages: c.messages.map((m) => (m.author === "me" ? { ...m, status: "read" as const } : m)),
+                    },
+              )
+            : [
+                {
+                  id,
+                  title: id,
+                  kind: "dm" as const,
+                  tone,
+                  presence: "online" as const,
+                  pinned: false,
+                  muted: false,
+                  about: "Usuario de PapusBank",
+                  members: [{ id, name: id, about: "Usuario de PapusBank", tone }],
+                  messages: [],
                   lastReadAt: now,
-                  messages: c.messages.map((m) => (m.author === "me" ? { ...m, status: "read" as const } : m)),
                 },
-          ),
-        }));
+                ...data.chats,
+              ];
+          return { ...data, chats };
+        });
         set({ activeChatId: id, view: "chats", replyId: null });
 
         // Sincronizar mensajes inmediatamente para este chat

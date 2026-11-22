@@ -1,9 +1,10 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Bell, BellOff, Phone, PhoneIncoming, PhoneMissed, PhoneOutgoing, Plus, ShieldCheck, Video, X } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatDuration, listTime } from "@/lib/papu/format";
 import { STORIES } from "@/lib/papu/seed";
-import { usePapu } from "@/lib/papu/store";
+import { usePapu, nickToTone } from "@/lib/papu/store";
+import { PapuApi } from "@/lib/papu/api";
 import type { Story, Tone } from "@/lib/papu/types";
 import { Avatar } from "@/components/papu/avatar";
 
@@ -15,45 +16,84 @@ function useSession() {
 }
 
 export function Updates() {
-  const { account, data } = useSession();
+  const { account, data, sessionUserId } = useSession();
   const setMyStatus = usePapu((s) => s.setMyStatus);
   const [draft, setDraft] = useState("");
   const [open, setOpen] = useState<number | null>(null);
-  const mine: Story | null = data?.myStatus
-    ? { id: "mine", name: account?.name || "Tú", tone: "amber", text: data.myStatus.text, minutesAgo: Math.max(1, Math.round((Date.now() - data.myStatus.at) / 60000)) }
-    : null;
-  const stories = mine ? [mine, ...STORIES] : STORIES;
+  const [apiStatuses, setApiStatuses] = useState<Array<{ id: number | string; nick: string; text: string; created_at: string }>>([]);
+  const [submitting, setSubmitting] = useState(false);
+
+  const isRealUser = Boolean(sessionUserId && sessionUserId !== "demo");
+
+  useEffect(() => {
+    if (isRealUser) {
+      void PapuApi.getStatuses().then((res) => {
+        setApiStatuses(res || []);
+      });
+    }
+  }, [isRealUser]);
+
+  const stories: Story[] = useMemo(() => {
+    if (!isRealUser) {
+      const mine: Story | null = data?.myStatus
+        ? { id: "mine", name: account?.name || "Tú", tone: "amber", text: data.myStatus.text, minutesAgo: Math.max(1, Math.round((Date.now() - data.myStatus.at) / 60000)) }
+        : null;
+      return mine ? [mine, ...STORIES] : STORIES;
+    }
+
+    return apiStatuses.map((s) => ({
+      id: String(s.id),
+      name: s.nick === sessionUserId ? "Tú" : s.nick,
+      tone: nickToTone(s.nick),
+      text: s.text,
+      minutesAgo: Math.max(1, Math.round((Date.now() - new Date(s.created_at).getTime()) / 60000)),
+    }));
+  }, [isRealUser, apiStatuses, data?.myStatus, account?.name, sessionUserId]);
+
+  async function handlePublish(event: React.FormEvent) {
+    event.preventDefault();
+    const clean = draft.trim();
+    if (!clean || submitting) return;
+    setSubmitting(true);
+    setMyStatus(clean);
+
+    if (isRealUser) {
+      const res = await PapuApi.postStatus(clean);
+      if (res.ok && res.status) {
+        setApiStatuses((prev) => [res.status, ...prev.filter((item) => String(item.id) !== String(res.status.id))]);
+      }
+    }
+    setDraft("");
+    setSubmitting(false);
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col bg-panel">
       <header className="px-5 pt-5 pb-3">
         <h1 className="font-display text-3xl">Novedades</h1>
-        <p className="mt-1 text-sm text-mute">Estados de ejemplo. El tuyo se guarda en este navegador.</p>
+        <p className="mt-1 text-sm text-mute">
+          {isRealUser ? "Estados reales de tus contactos de PapusBank (24h)." : "Estados de ejemplo. El tuyo se guarda en este navegador."}
+        </p>
       </header>
       <div className="flex gap-4 overflow-x-auto px-5 pb-4">
-        <button type="button" className="w-20 shrink-0 text-center" onClick={() => setDraft(data?.myStatus?.text ?? "")}>
-          <span className="mx-auto flex size-16 items-center justify-center rounded-full border border-dashed border-amber text-amber">
+        <button type="button" className="w-20 shrink-0 text-center cursor-pointer" onClick={() => setDraft(data?.myStatus?.text ?? "")}>
+          <span className="mx-auto flex size-16 items-center justify-center rounded-full border border-dashed border-amber text-amber hover:bg-amber/10 transition">
             <Plus className="size-6" aria-hidden="true" />
           </span>
           <span className="mt-2 block text-xs text-bone-dim">Tu estado</span>
         </button>
         {stories.map((story, index) => (
-          <button key={story.id} type="button" className="w-20 shrink-0 text-center" onClick={() => setOpen(index)}>
+          <button key={story.id} type="button" className="w-20 shrink-0 text-center cursor-pointer" onClick={() => setOpen(index)}>
             <span className="mx-auto block rounded-full ring-2 ring-amber ring-offset-2 ring-offset-panel">
               <Avatar name={story.name} tone={story.tone} size="lg" className="mx-auto" />
             </span>
-            <span className="mt-2 block truncate text-xs text-bone-dim">{story.id === "mine" ? "Tú" : story.name.split(" ")[0]}</span>
+            <span className="mt-2 block truncate text-xs text-bone-dim">{story.name === "Tú" ? "Tú" : story.name.split(" ")[0]}</span>
           </button>
         ))}
       </div>
       <form
         className="mx-5 mb-4 rounded-2xl border border-line bg-ink p-4"
-        onSubmit={(event) => {
-          event.preventDefault();
-          if (!draft.trim()) return;
-          setMyStatus(draft);
-          setDraft("");
-        }}
+        onSubmit={(event) => void handlePublish(event)}
       >
         <label className="block text-sm text-bone-dim" htmlFor="status">
           Publicar un estado
@@ -64,22 +104,35 @@ export function Updates() {
           onChange={(event) => setDraft(event.target.value)}
           maxLength={140}
           rows={2}
-          placeholder="Qué estás haciendo"
+          placeholder="¿Qué estás pensando?"
           className="mt-2 w-full resize-none bg-transparent text-base text-bone outline-none placeholder:text-mute"
         />
-        <button type="submit" className="mt-2 h-10 rounded-full bg-amber px-4 text-sm font-semibold text-ink active:scale-[0.96]">
-          Publicar
+        <button
+          type="submit"
+          disabled={submitting || !draft.trim()}
+          className="mt-2 h-10 rounded-full bg-amber px-4 text-sm font-semibold text-ink active:scale-[0.96] disabled:opacity-50 cursor-pointer"
+        >
+          {submitting ? "Publicando…" : "Publicar"}
         </button>
       </form>
-      <ul className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
-        {stories.map((story) => (
-          <li key={story.id} className="border-b border-line py-4">
-            <p className="font-semibold">{story.name}</p>
-            <p className="mt-1 text-sm text-pretty text-bone-dim">{story.text}</p>
-            <p className="mt-2 text-xs text-mute">hace {story.minutesAgo} min</p>
-          </li>
-        ))}
-      </ul>
+      <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-6">
+        {stories.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-10 text-center text-mute">
+            <p className="text-sm font-medium text-bone-dim">Aún no hay estados recientes</p>
+            <p className="mt-1 text-xs">Publica uno arriba para que tus contactos de PapusBank puedan verlo.</p>
+          </div>
+        ) : (
+          <ul>
+            {stories.map((story) => (
+              <li key={story.id} className="border-b border-line py-4">
+                <p className="font-semibold">{story.name}</p>
+                <p className="mt-1 text-sm text-pretty text-bone-dim">{story.text}</p>
+                <p className="mt-2 text-xs text-mute">hace {story.minutesAgo} min</p>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
       {open != null ? <StoryView stories={stories} index={open} onClose={() => setOpen(null)} onIndex={setOpen} /> : null}
     </div>
   );

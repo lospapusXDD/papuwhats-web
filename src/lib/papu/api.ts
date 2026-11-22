@@ -273,6 +273,66 @@ export const PapuApi = {
     }
   },
 
+  async acceptFriendRequest(fromNick: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const url = getBaseUrl() + "/papuwhats/friends/accept";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ from: fromNick.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { ok: false, error: data.error };
+      return { ok: true, message: data.message };
+    } catch (e: any) {
+      return { ok: false, error: e.message };
+    }
+  },
+
+  async rejectFriendRequest(fromNick: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const url = getBaseUrl() + "/papuwhats/friends/reject";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ from: fromNick.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { ok: false, error: data.error };
+      return { ok: true, message: data.message };
+    } catch (e: any) {
+      return { ok: false, error: e.message };
+    }
+  },
+
+  async postStatus(text: string): Promise<{ ok: boolean; status?: any; error?: string }> {
+    try {
+      const url = getBaseUrl() + "/papuwhats/status";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ text: text.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) return { ok: false, error: data.error || "No se pudo publicar el estado" };
+      return { ok: true, status: data.status };
+    } catch (e: any) {
+      return { ok: false, error: e.message };
+    }
+  },
+
+  async getStatuses(): Promise<Array<{ id: number | string; nick: string; text: string; created_at: string }>> {
+    try {
+      const url = getBaseUrl() + "/papuwhats/statuses";
+      const res = await fetch(url, { headers: this.getHeaders() });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.statuses || [];
+    } catch {
+      return [];
+    }
+  },
+
   async sendCallSignal(callId: string, signal: any): Promise<boolean> {
     try {
       const url = getBaseUrl() + "/papuwhats/call/signal";
