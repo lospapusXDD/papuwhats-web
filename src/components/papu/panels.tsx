@@ -262,8 +262,8 @@ function InstallSection() {
     };
   }, []);
 
-  const curlLinux = "curl -fsSL https://lospapusxdd.github.io/papuwhats-web/install.sh | bash";
-  const psWindows = "irm https://lospapusxdd.github.io/papuwhats-web/install.ps1 | iex";
+  const curlLinux = "curl -fsSL https://raw.githubusercontent.com/lospapusXDD/papuwhats-web/main/install.sh | bash";
+  const psWindows = "irm https://raw.githubusercontent.com/lospapusXDD/papuwhats-web/main/install.ps1 | iex";
 
   const handleCopy = (cmd: string) => {
     void navigator.clipboard.writeText(cmd);
