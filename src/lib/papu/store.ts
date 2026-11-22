@@ -3,7 +3,8 @@ import { createJSONStorage, persist } from "zustand/middleware";
 import { playConnect, playReceive, playSend, startRing, stopRing } from "@/lib/papu/audio";
 import { craftReply } from "@/lib/papu/replies";
 import { DEMO_EMAIL, DEMO_ID, DEMO_PASSWORD, demoAccount, demoData, freshData } from "@/lib/papu/seed";
-import { PapuApi } from "@/lib/papu/api";
+import { PapuApi, type ApiMessage } from "@/lib/papu/api";
+import { initCallPeer, cleanupCall, setLocalAudioMuted, setLocalCameraEnabled } from "@/lib/papu/webrtc";
 import type { Account, AppView, Chat, LiveCall, Message, PendingAuth, Tone, UserData } from "@/lib/papu/types";
 
 type PapuState = {
@@ -85,6 +86,64 @@ export function nickToTone(nick: string): Tone {
   let hash = 0;
   for (let i = 0; i < nick.length; i++) hash = (hash << 5) - hash + nick.charCodeAt(i);
   return tones[Math.abs(hash) % tones.length];
+}
+
+export function parseApiMessage(m: ApiMessage, myNick: string): Message {
+  let kind: Message["kind"] = "text";
+  let body = m.msg || "";
+  let mediaUrl: string | undefined = undefined;
+  let mediaName: string | undefined = undefined;
+  let durationMs: number | undefined = undefined;
+  let callKind: Message["callKind"] = undefined;
+  let callResult: Message["callResult"] = undefined;
+  let replyId: string | undefined = undefined;
+
+  const raw = (m.msg || "").trim();
+  if (raw.startsWith("{") && raw.endsWith("}")) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (parsed && typeof parsed === "object" && parsed.kind) {
+        kind = parsed.kind;
+        body = parsed.body || (kind === "voice" ? "Nota de voz" : kind === "image" ? "Imagen" : "");
+        mediaUrl = parsed.mediaUrl;
+        mediaName = parsed.mediaName;
+        durationMs = parsed.durationMs;
+        callKind = parsed.callKind;
+        callResult = parsed.callResult;
+        replyId = parsed.replyId;
+      }
+    } catch {
+      // no es JSON válido
+    }
+  }
+
+  if (kind === "text") {
+    if (raw.startsWith("data:audio/") || /\.webm$|\.ogg$|\.mp3$|\.wav$/i.test(raw)) {
+      kind = "voice";
+      mediaUrl = raw;
+      body = "Nota de voz";
+    } else if (raw.startsWith("data:image/") || /^https?:\/\/.*\.(png|jpe?g|gif|webp)(\?.*)?$/i.test(raw)) {
+      kind = "image";
+      mediaUrl = raw;
+      body = "Imagen";
+    }
+  }
+
+  return {
+    id: String(m.id),
+    author: m.from_nick === myNick ? "me" : "them",
+    senderName: m.from_nick,
+    kind,
+    body,
+    mediaUrl,
+    mediaName,
+    durationMs,
+    callKind,
+    callResult,
+    replyId,
+    createdAt: new Date(m.created_at).getTime(),
+    status: m.read ? "read" : "delivered",
+  };
 }
 
 function six() {
@@ -321,6 +380,7 @@ export const usePapu = create<PapuState>()(
 
       logout: () => {
         stopRing();
+        cleanupCall();
         PapuApi.clearToken();
         set({
           sessionUserId: null,
@@ -359,15 +419,7 @@ export const usePapu = create<PapuState>()(
             const apiMsgs = await PapuApi.getMessages(id);
             if (apiMsgs && apiMsgs.length > 0) {
               const myNick = get().sessionUserId || "";
-              const formattedMsgs: Message[] = apiMsgs.map((m) => ({
-                id: String(m.id),
-                author: m.from_nick === myNick ? "me" : "them",
-                senderName: m.from_nick,
-                kind: "text",
-                body: m.msg,
-                createdAt: new Date(m.created_at).getTime(),
-                status: m.read ? "read" : "delivered",
-              }));
+              const formattedMsgs: Message[] = apiMsgs.map((m) => parseApiMessage(m, myNick));
               patchUser(set, get, (data) => ({
                 ...data,
                 chats: data.chats.map((c) => (c.id === id ? { ...c, messages: formattedMsgs, lastReadAt: Date.now() } : c)),
@@ -481,15 +533,16 @@ export const usePapu = create<PapuState>()(
         }
       },
 
-      sendMedia: (input) => {
+      sendMedia: async (input) => {
         const cur = current(get);
         const chatId = get().activeChatId;
         if (!cur || !chatId) return;
 
         const replyId = get().replyId ?? undefined;
+        const tempId = uid("m");
         const message: Message = {
           ...input,
-          id: uid("m"),
+          id: tempId,
           author: "me",
           createdAt: Date.now(),
           status: "sent",
@@ -502,6 +555,34 @@ export const usePapu = create<PapuState>()(
         }));
         set(() => ({ replyId: null }));
         if (soundOn(get)) playSend();
+
+        const token = PapuApi.getToken();
+        if (token && chatId !== "valeria" && chatId !== "mateo") {
+          const payload = JSON.stringify({
+            kind: input.kind,
+            body: input.body,
+            mediaUrl: input.mediaUrl,
+            mediaName: input.mediaName,
+            durationMs: input.durationMs,
+            replyId,
+          });
+          const apiMsg = await PapuApi.sendMessage(chatId, payload);
+          if (apiMsg) {
+            patchUser(set, get, (data) => ({
+              ...data,
+              chats: data.chats.map((c) =>
+                c.id !== chatId
+                  ? c
+                  : {
+                      ...c,
+                      messages: c.messages.map((m) =>
+                        m.id === tempId ? { ...m, id: String(apiMsg.id), status: "delivered" } : m,
+                      ),
+                    },
+              ),
+            }));
+          }
+        }
       },
 
       deleteMessage: async (chatId, messageId) => {
@@ -515,20 +596,44 @@ export const usePapu = create<PapuState>()(
         }));
       },
 
-      startOutgoing: (chatId, kind) => {
+      startOutgoing: async (chatId, kind) => {
         stopRing();
-        const id = uid("live");
-        set({
-          call: { id, chatId, kind, direction: "out", phase: "outgoing", startedAt: null, muted: false, cameraOn: false },
-        });
-        if (soundOn(get)) startRing();
-        window.setTimeout(() => {
-          const call = get().call;
-          if (!call || call.id !== id || call.phase !== "outgoing") return;
-          stopRing();
-          playConnect();
-          set({ call: { ...call, phase: "active", startedAt: Date.now() } });
-        }, 1700);
+        cleanupCall();
+        const token = PapuApi.getToken();
+        if (token && chatId !== "valeria" && chatId !== "mateo") {
+          const res = await PapuApi.startCall(chatId, kind);
+          if (!res.ok || !res.call) {
+            return;
+          }
+          const callSession = res.call;
+          set({
+            call: {
+              id: callSession.id,
+              chatId,
+              kind,
+              direction: "out",
+              phase: "outgoing",
+              startedAt: null,
+              muted: false,
+              cameraOn: kind === "video",
+            },
+          });
+          if (soundOn(get)) startRing();
+          void initCallPeer(callSession.id, true, kind);
+        } else {
+          const id = uid("live");
+          set({
+            call: { id, chatId, kind, direction: "out", phase: "outgoing", startedAt: null, muted: false, cameraOn: false },
+          });
+          if (soundOn(get)) startRing();
+          window.setTimeout(() => {
+            const call = get().call;
+            if (!call || call.id !== id || call.phase !== "outgoing") return;
+            stopRing();
+            playConnect();
+            set({ call: { ...call, phase: "active", startedAt: Date.now() } });
+          }, 1700);
+        }
       },
 
       startIncoming: (chatId) => {
@@ -577,25 +682,44 @@ export const usePapu = create<PapuState>()(
         }, 20000);
       },
 
-      acceptCall: () => {
+      acceptCall: async () => {
         const call = get().call;
         if (!call) return;
         stopRing();
         playConnect();
         set({ call: { ...call, phase: "active", startedAt: Date.now() } });
+
+        const token = PapuApi.getToken();
+        if (token && call.chatId !== "valeria" && call.chatId !== "mateo") {
+          void PapuApi.respondCall(call.id, "accept");
+          void initCallPeer(call.id, false, call.kind);
+        }
       },
 
-      endCall: () => finishCall(set, get),
+      endCall: async () => {
+        const call = get().call;
+        if (!call) return;
+        stopRing();
+        cleanupCall();
+        const token = PapuApi.getToken();
+        if (token && call.chatId !== "valeria" && call.chatId !== "mateo") {
+          const action = call.phase === "incoming" ? "decline" : "end";
+          void PapuApi.respondCall(call.id, action);
+        }
+        finishCall(set, get);
+      },
 
       setCallMuted: (muted) => {
         const call = get().call;
         if (!call) return;
+        setLocalAudioMuted(muted);
         set({ call: { ...call, muted } });
       },
 
       setCamera: (on) => {
         const call = get().call;
         if (!call) return;
+        setLocalCameraEnabled(on);
         set({ call: { ...call, cameraOn: on } });
       },
 
@@ -621,14 +745,67 @@ export const usePapu = create<PapuState>()(
         if (!token || !myNick || myNick === DEMO_ID) return;
 
         try {
-          const [convs, friendsData] = await Promise.all([
+          const [convs, friendsData, callInfo] = await Promise.all([
             PapuApi.getConversations(),
             PapuApi.getFriends(),
+            PapuApi.checkCalls(),
           ]);
+
+          // Señalización de llamadas en tiempo real
+          const currentCall = get().call;
+          if (callInfo?.incoming) {
+            const inc = callInfo.incoming;
+            if (!currentCall || currentCall.id !== inc.id) {
+              set({
+                call: {
+                  id: inc.id,
+                  chatId: inc.from,
+                  kind: inc.kind || "voice",
+                  direction: "in",
+                  phase: "incoming",
+                  startedAt: null,
+                  muted: false,
+                  cameraOn: false,
+                },
+              });
+              if (soundOn(get)) startRing();
+            }
+          } else if (currentCall) {
+            if (currentCall.phase === "outgoing") {
+              if (callInfo?.active && callInfo.active.id === currentCall.id) {
+                if (callInfo.active.status === "active") {
+                  stopRing();
+                  playConnect();
+                  set({
+                    call: {
+                      ...currentCall,
+                      phase: "active",
+                      startedAt: callInfo.active.startedAt || Date.now(),
+                    },
+                  });
+                } else if (callInfo.active.status === "declined" || callInfo.active.status === "ended") {
+                  stopRing();
+                  cleanupCall();
+                  finishCall(set, get);
+                }
+              } else if (!callInfo?.active) {
+                stopRing();
+                cleanupCall();
+                set({ call: null });
+              }
+            } else if (currentCall.phase === "active") {
+              if (!callInfo?.active || callInfo.active.id !== currentCall.id || callInfo.active.status === "ended" || callInfo.active.status === "declined") {
+                stopRing();
+                cleanupCall();
+                finishCall(set, get);
+              }
+            }
+          }
 
           const contactNicks = new Set<string>();
           convs.forEach((c) => contactNicks.add(c.contact));
           friendsData.friends.forEach((f) => contactNicks.add(f.friend_nick));
+          if (callInfo?.incoming?.from) contactNicks.add(callInfo.incoming.from);
 
           patchUser(set, get, (data) => {
             const existingMap = new Map(data.chats.map((c) => [c.id, c]));
@@ -662,15 +839,7 @@ export const usePapu = create<PapuState>()(
           if (activeChat && activeChat !== "valeria" && activeChat !== "mateo") {
             const apiMsgs = await PapuApi.getMessages(activeChat);
             if (apiMsgs && apiMsgs.length > 0) {
-              const formattedMsgs: Message[] = apiMsgs.map((m) => ({
-                id: String(m.id),
-                author: m.from_nick === myNick ? "me" : "them",
-                senderName: m.from_nick,
-                kind: "text",
-                body: m.msg,
-                createdAt: new Date(m.created_at).getTime(),
-                status: m.read ? "read" : "delivered",
-              }));
+              const formattedMsgs: Message[] = apiMsgs.map((m) => parseApiMessage(m, myNick));
 
               const curChat = current(get)?.data.chats.find((c) => c.id === activeChat);
               const prevMsgCount = curChat?.messages.length || 0;
@@ -716,12 +885,12 @@ export const usePapu = create<PapuState>()(
   ),
 );
 
-// Polling en segundo plano cada 2.5s para recibir mensajes en tiempo real
+// Polling en segundo plano cada 2s para recibir mensajes y llamadas en tiempo real
 if (typeof window !== "undefined") {
   setInterval(() => {
     const state = usePapu.getState();
     if (state.sessionUserId && !document.hidden) {
       void state.syncFromApi();
     }
-  }, 2500);
+  }, 2000);
 }

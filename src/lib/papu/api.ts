@@ -229,4 +229,73 @@ export const PapuApi = {
       return { ok: false, error: e.message };
     }
   },
+
+  async startCall(toNick: string, kind: "voice" | "video"): Promise<{ ok: boolean; call?: any; error?: string }> {
+    try {
+      const url = getBaseUrl() + "/papuwhats/call/start";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ to: toNick.trim(), kind }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) return { ok: false, error: data.error || "No se pudo iniciar la llamada" };
+      return { ok: true, call: data.call };
+    } catch (e: any) {
+      return { ok: false, error: e.message };
+    }
+  },
+
+  async checkCalls(): Promise<{ incoming?: any; active?: any } | null> {
+    try {
+      const url = getBaseUrl() + "/papuwhats/call/check";
+      const res = await fetch(url, { headers: this.getHeaders() });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch {
+      return null;
+    }
+  },
+
+  async respondCall(callId: string, action: "accept" | "decline" | "end"): Promise<{ ok: boolean; call?: any; error?: string }> {
+    try {
+      const url = getBaseUrl() + "/papuwhats/call/respond";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ callId, action }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) return { ok: false, error: data.error || "Error al responder llamada" };
+      return { ok: true, call: data.call };
+    } catch (e: any) {
+      return { ok: false, error: e.message };
+    }
+  },
+
+  async sendCallSignal(callId: string, signal: any): Promise<boolean> {
+    try {
+      const url = getBaseUrl() + "/papuwhats/call/signal";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: this.getHeaders(),
+        body: JSON.stringify({ callId, signal }),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  },
+
+  async getCallSignals(callId: string): Promise<any[]> {
+    try {
+      const url = getBaseUrl() + "/papuwhats/call/signals?callId=" + encodeURIComponent(callId);
+      const res = await fetch(url, { headers: this.getHeaders() });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return data.signals || [];
+    } catch {
+      return [];
+    }
+  },
 };

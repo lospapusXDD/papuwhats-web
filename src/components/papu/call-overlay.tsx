@@ -3,6 +3,7 @@ import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
 import { formatDuration } from "@/lib/papu/format";
 import { usePapu } from "@/lib/papu/store";
 import { Avatar } from "@/components/papu/avatar";
+import { onRemoteStreamChange } from "@/lib/papu/webrtc";
 
 export function CallOverlay() {
   const call = usePapu((s) => s.call);
@@ -13,9 +14,26 @@ export function CallOverlay() {
   const setCallMuted = usePapu((s) => s.setCallMuted);
   const setCamera = usePapu((s) => s.setCamera);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [camError, setCamError] = useState(false);
   const chat = data?.chats.find((item) => item.id === call?.chatId);
+
+  useEffect(() => {
+    return onRemoteStreamChange((stream) => {
+      setRemoteStream(stream);
+      if (remoteVideoRef.current && stream) {
+        remoteVideoRef.current.srcObject = stream;
+      }
+    });
+  }, []);
+
+  useEffect(() => {
+    if (remoteVideoRef.current && remoteStream) {
+      remoteVideoRef.current.srcObject = remoteStream;
+    }
+  }, [remoteStream]);
 
   useEffect(() => {
     if (call?.phase !== "active") return;
@@ -53,21 +71,32 @@ export function CallOverlay() {
   const status =
     call.phase === "incoming" ? "Llamada entrante" : call.phase === "outgoing" ? "Llamando…" : formatDuration(now - (call.startedAt ?? now));
 
+  const hasRemoteVideo = remoteStream && remoteStream.getVideoTracks().length > 0;
+
   return (
-    <div className="fixed inset-0 z-40 flex flex-col bg-ink text-bone">
-      <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
-        <div className="relative">
-          <span className="pulse-ring absolute -inset-4 rounded-full border border-amber/70" />
-          <span className="pulse-ring absolute -inset-8 rounded-full border border-amber/40 [animation-delay:0.8s]" />
-          <Avatar name={chat.title} tone={chat.tone} size="xl" />
+    <div className="fixed inset-0 z-40 flex flex-col bg-ink text-bone overflow-hidden">
+      {hasRemoteVideo ? (
+        <div className="absolute inset-0 z-0">
+          <video ref={remoteVideoRef} autoPlay playsInline className="h-full w-full object-cover" />
+          <div className="absolute inset-0 bg-ink/40" />
         </div>
-        <h2 className="mt-8 font-display text-4xl text-balance">{chat.title}</h2>
-        <p className="mt-2 text-bone-dim">
+      ) : null}
+
+      <div className="relative z-10 flex flex-1 flex-col items-center justify-center px-6 text-center">
+        {!hasRemoteVideo ? (
+          <div className="relative">
+            <span className="pulse-ring absolute -inset-4 rounded-full border border-amber/70" />
+            <span className="pulse-ring absolute -inset-8 rounded-full border border-amber/40 [animation-delay:0.8s]" />
+            <Avatar name={chat.title} tone={chat.tone} size="xl" />
+          </div>
+        ) : null}
+        <h2 className="mt-8 font-display text-4xl text-balance drop-shadow-md">{chat.title}</h2>
+        <p className="mt-2 text-bone-dim drop-shadow-sm">
           {call.kind === "video" ? "Video" : "Voz"} · <span className="tabular-nums">{status}</span>
         </p>
         {call.muted ? <p className="mt-2 text-sm text-mute">Micrófono en silencio</p> : null}
         {call.cameraOn ? (
-          <div className="mt-6 h-40 w-28 overflow-hidden rounded-2xl border border-line bg-panel">
+          <div className="mt-6 h-40 w-28 overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
             {camError ? (
               <p className="flex h-full items-center px-3 text-xs text-mute">Cámara no disponible</p>
             ) : (
