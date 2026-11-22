@@ -1,0 +1,385 @@
+@import "tailwindcss";
+@import "@fontsource/outfit/latin-400.css";
+@import "@fontsource/outfit/latin-500.css";
+@import "@fontsource/outfit/latin-600.css";
+@import "@fontsource/outfit/latin-700.css";
+@import "@fontsource/fraunces/latin-600.css";
+@import "@fontsource/fraunces/latin-600-italic.css";
+
+@theme {
+  --color-ink: #0c0b09;
+  --color-panel: #16140f;
+  --color-panel-2: #221f19;
+  --color-line: #3a342c;
+  --color-bone: #f3efe6;
+  --color-bone-dim: #c9c2b4;
+  --color-mute: #8a8276;
+  --color-amber: #e2a15a;
+  --color-clay: #a34132;
+  --color-clay-bright: #e7a89c;
+  --color-moss: #1b5c3d;
+  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", ui-serif, Georgia, serif;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100dvh;
+    background: var(--color-ink);
+    color: var(--color-bone);
+    font-family: var(--font-sans);
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  ::selection {
+    background: var(--color-amber);
+    color: var(--color-ink);
+  }
+
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-line) transparent;
+  }
+}
+
+@layer components {
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .brand-grid {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--color-bone) 7%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--color-bone) 7%, transparent) 1px, transparent 1px);
+    background-size: 3rem 3rem;
+  }
+
+  .thread-bg {
+    background-color: var(--color-ink);
+    background-image: radial-gradient(
+      circle at 1px 1px,
+      color-mix(in oklab, var(--color-bone) 9%, transparent) 1px,
+      transparent 0
+    );
+    background-size: 1.125rem 1.125rem;
+  }
+
+  .draw-shield {
+    stroke-dasharray: 240;
+    stroke-dashoffset: 240;
+    animation: draw-shield 900ms ease forwards;
+  }
+
+  .rise {
+    animation: rise 520ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+
+  .floaty {
+    animation: floaty 6s ease-in-out infinite;
+  }
+
+  .shake {
+    animation: shake 320ms ease;
+  }
+
+  .story-fill {
+    transform-origin: left;
+    animation: story-fill 6s linear forwards;
+  }
+
+  .rec-dot {
+    animation: rec-dot 1s ease-in-out infinite;
+  }
+
+  .glow-orb {
+    position: absolute;
+    border-radius: 9999px;
+    filter: blur(48px);
+    animation: orb-drift 18s ease-in-out infinite alternate;
+  }
+
+  .stage-grid {
+    background-image:
+      linear-gradient(to right, color-mix(in oklab, var(--color-bone) 8%, transparent) 1px, transparent 1px),
+      linear-gradient(to bottom, color-mix(in oklab, var(--color-bone) 8%, transparent) 1px, transparent 1px);
+    background-size: 3.5rem 3.5rem;
+    animation: grid-pan 32s linear infinite;
+    mask-image: radial-gradient(circle at center, black 20%, transparent 75%);
+  }
+
+  .spark {
+    position: absolute;
+    width: 0.3rem;
+    height: 0.3rem;
+    border-radius: 9999px;
+    background: var(--color-amber);
+    box-shadow: 0 0 12px var(--color-amber);
+    animation: spark 8s ease-in-out infinite;
+  }
+
+  .orbit {
+    position: absolute;
+    inset: -1.15rem;
+    border-radius: 9999px;
+    border: 1px solid color-mix(in oklab, var(--color-amber) 55%, transparent);
+    animation: spin 16s linear infinite;
+  }
+
+  .orbit i {
+    position: absolute;
+    top: -0.28rem;
+    left: 50%;
+    width: 0.55rem;
+    height: 0.55rem;
+    border-radius: 9999px;
+    background: var(--color-bone);
+    box-shadow: 0 0 14px var(--color-amber);
+  }
+
+  .card-frame {
+    position: relative;
+    isolation: isolate;
+  }
+
+  .card-frame::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    z-index: 0;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(
+      from var(--spin),
+      transparent 0deg,
+      var(--color-amber) 48deg,
+      transparent 110deg,
+      transparent 250deg,
+      var(--color-bone) 300deg,
+      transparent 360deg
+    );
+    animation: spin-border 7s linear infinite;
+    pointer-events: none;
+    mask:
+      linear-gradient(#000 0 0) content-box,
+      linear-gradient(#000 0 0);
+    mask-composite: exclude;
+  }
+
+  .btn-sheen {
+    position: relative;
+    overflow: hidden;
+  }
+
+  .btn-sheen::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(
+      105deg,
+      transparent 32%,
+      color-mix(in oklab, white 62%, transparent) 50%,
+      transparent 68%
+    );
+    transform: translateX(-130%);
+    animation: sheen 3.6s ease-in-out infinite;
+    pointer-events: none;
+  }
+
+  .row-in {
+    animation: rise 420ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+
+  .bubble-in {
+    animation: bubble-in 280ms cubic-bezier(0.2, 0, 0, 1) both;
+  }
+
+  .pulse-ring {
+    animation: pulse-ring 2.4s ease-out infinite;
+  }
+
+  .app-glow {
+    pointer-events: none;
+    position: absolute;
+    inset: auto auto 10% -8%;
+    width: 28rem;
+    height: 28rem;
+    border-radius: 9999px;
+    background: color-mix(in oklab, var(--color-amber) 28%, transparent);
+    filter: blur(70px);
+    animation: orb-drift 22s ease-in-out infinite alternate;
+  }
+}
+
+@keyframes draw-shield {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(0.75rem);
+    filter: blur(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+@keyframes floaty {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-0.4rem);
+  }
+}
+
+@keyframes shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-0.4rem);
+  }
+  75% {
+    transform: translateX(0.4rem);
+  }
+}
+
+@keyframes story-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(1);
+  }
+}
+
+@keyframes rec-dot {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@property --spin {
+  syntax: "<angle>";
+  inherits: false;
+  initial-value: 0deg;
+}
+
+@keyframes orb-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(8%, 10%, 0) scale(1.18);
+  }
+}
+
+@keyframes grid-pan {
+  to {
+    background-position: 3.5rem 3.5rem;
+  }
+}
+
+@keyframes spark {
+  0%,
+  100% {
+    opacity: 0.15;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-1.4rem);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes spin-border {
+  to {
+    --spin: 360deg;
+  }
+}
+
+@keyframes sheen {
+  0%,
+  58% {
+    transform: translateX(-130%);
+  }
+  82%,
+  100% {
+    transform: translateX(130%);
+  }
+}
+
+@keyframes bubble-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes pulse-ring {
+  0% {
+    transform: scale(0.86);
+    opacity: 0.65;
+  }
+  100% {
+    transform: scale(1.28);
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .draw-shield,
+  .rise,
+  .floaty,
+  .shake,
+  .story-fill,
+  .rec-dot,
+  .glow-orb,
+  .stage-grid,
+  .spark,
+  .orbit,
+  .card-frame::before,
+  .btn-sheen::after,
+  .row-in,
+  .bubble-in,
+  .pulse-ring,
+  .app-glow {
+    animation: none !important;
+  }
+
+  .story-fill {
+    transform: scaleX(1);
+  }
+}

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="PapuWhats">
+  <rect width="32" height="32" rx="8" fill="#0C0B09"/>
+  <rect x="14" y="5" width="13" height="10.5" rx="3.5" fill="#F3EFE6"/>
+  <path fill="#F3EFE6" d="M17 15.5h5.2L17.4 20.2z"/>
+  <rect x="5" y="13" width="15.5" height="11" rx="3.75" fill="#E2A15A"/>
+  <path fill="#E2A15A" d="M8 24h5.6L8.4 28.4z"/>
+</svg>
