@@ -1,9 +1,10 @@
-import { useEffect, type ReactNode } from "react";
-import { MessageCircle, Phone, Settings, Sparkles } from "lucide-react";
+import { useState, useEffect, type ReactNode } from "react";
+import { Bell, MessageCircle, Phone, Settings, Sparkles } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { unreadCount } from "@/lib/papu/format";
 import { usePapu } from "@/lib/papu/store";
 import type { AppView } from "@/lib/papu/types";
+import { notifyUser, requestNotificationPermission } from "@/lib/papu/notify";
 import { Mark } from "@/components/papu/logo";
 import { ChatList } from "@/components/papu/chat-list";
 import { Thread } from "@/components/papu/thread";
@@ -16,6 +17,67 @@ const nav: { id: AppView; label: string; icon: typeof MessageCircle }[] = [
   { id: "calls", label: "Llamadas", icon: Phone },
   { id: "settings", label: "Ajustes", icon: Settings },
 ];
+
+function NotificationBanner() {
+  const [show, setShow] = useState(false);
+  const [asking, setAsking] = useState(false);
+
+  useEffect(() => {
+    if (typeof window === "undefined" || !("Notification" in window)) return;
+    const isElectron =
+      navigator.userAgent.toLowerCase().includes("electron") ||
+      Boolean((window as any).process?.versions?.electron);
+    if (isElectron) return;
+
+    if (Notification.permission === "default") {
+      setShow(true);
+    }
+  }, []);
+
+  if (!show) return null;
+
+  const handleEnable = async () => {
+    setAsking(true);
+    try {
+      const granted = await requestNotificationPermission();
+      if (granted) {
+        setShow(false);
+        void notifyUser("🔔 ¡Notificaciones activadas!", {
+          body: "Ahora recibirás llamadas y mensajes en segundo plano.",
+        });
+      } else {
+        setShow(false);
+      }
+    } finally {
+      setAsking(false);
+    }
+  };
+
+  return (
+    <aside aria-label="Permiso de notificaciones" className="relative z-30 flex items-center justify-between gap-3 border-b border-gold/30 bg-gold/15 px-4 py-2 text-xs text-gold backdrop-blur-md">
+      <div className="flex items-center gap-2">
+        <Bell className="size-4 shrink-0 text-gold animate-bounce" />
+        <span><strong>Activa las notificaciones</strong> para recibir llamadas y mensajes aunque tengas la pantalla bloqueada o estés en otra app.</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleEnable}
+          disabled={asking}
+          className="rounded-lg bg-gold px-3 py-1 font-semibold text-ink shadow transition hover:bg-gold/90 active:scale-95 disabled:opacity-50"
+        >
+          {asking ? "Activando..." : "Activar"}
+        </button>
+        <button
+          onClick={() => setShow(false)}
+          className="rounded p-1 text-stone-400 hover:text-white"
+          title="Cerrar aviso"
+        >
+          ✕
+        </button>
+      </div>
+    </aside>
+  );
+}
 
 export function Messenger() {
   const view = usePapu((s) => s.view);
@@ -51,6 +113,7 @@ export function Messenger() {
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-ink text-bone">
       <div className="app-glow" aria-hidden="true" />
+      <NotificationBanner />
       <div className="relative flex min-h-0 flex-1">
         <aside className="hidden w-20 shrink-0 flex-col items-center gap-2 border-r border-line bg-panel py-3 md:flex">
           <Mark className="mb-2 size-10" />

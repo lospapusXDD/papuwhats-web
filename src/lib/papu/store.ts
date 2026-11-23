@@ -534,6 +534,7 @@ export const usePapu = create<PapuState>()(
                     },
               ),
             }));
+            void get().syncFromApi();
           }
         } else {
           // Si es cuenta de demostración local, simular respuesta
@@ -608,6 +609,7 @@ export const usePapu = create<PapuState>()(
                     },
               ),
             }));
+            void get().syncFromApi();
           }
         }
       },
@@ -770,6 +772,7 @@ export const usePapu = create<PapuState>()(
         const token = PapuApi.getToken();
         const myNick = get().sessionUserId;
         if (!token || !myNick || myNick === DEMO_ID) return;
+        const activeChat = get().activeChatId;
 
         try {
           const [convs, friendsData, callInfo] = await Promise.all([
@@ -934,8 +937,7 @@ export const usePapu = create<PapuState>()(
             lastSeenConvs.set(c.contact, lastAt);
           });
 
-          // Si hay chat activo, traer los mensajes
-          const activeChat = get().activeChatId;
+          // Si hay chat activo, traer los mensajes de inmediato
           if (activeChat && activeChat !== "valeria" && activeChat !== "mateo") {
             const apiMsgs = await PapuApi.getMessages(activeChat);
             if (apiMsgs && apiMsgs.length > 0) {
@@ -1001,7 +1003,7 @@ if (typeof window !== "undefined") {
   try {
     const workerBlob = new Blob(
       [
-        `setInterval(function() { postMessage('tick'); }, 2000);`,
+        `setInterval(function() { postMessage('tick'); }, 1000);`,
       ],
       { type: "application/javascript" },
     );
@@ -1011,6 +1013,6 @@ if (typeof window !== "undefined") {
       poll();
     };
   } catch {
-    setInterval(poll, 2000);
+    setInterval(poll, 1000);
   }
 }

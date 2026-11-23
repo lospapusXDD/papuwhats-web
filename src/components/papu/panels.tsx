@@ -357,7 +357,17 @@ function InstallSection() {
 
       {selectedOs === "windows" && (
         <div className="mt-3 space-y-3">
-          <p className="text-xs text-bone-dim">Ejecuta en PowerShell para descargar, extraer e iniciar en 1 clic:</p>
+          <p className="text-xs text-bone-dim">Elige el instalador oficial .EXE o el comando automático de PowerShell:</p>
+          <a
+            href="https://github.com/lospapusXDD/papuwhats-web/releases/download/v1.0.0/PapuWhats-Setup-1.0.0.exe"
+            target="_blank"
+            rel="noreferrer"
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber px-4 text-xs font-bold text-ink shadow transition hover:bg-amber/90 active:scale-[0.98]"
+          >
+            <Download className="size-4" />
+            Descargar Instalador PapuWhats.exe (Windows)
+          </a>
+          <p className="text-[11px] text-mute text-center">Configura accesos directos, notificaciones nativas y permisos automáticamente.</p>
           <div className="relative flex items-center rounded-xl border border-line bg-panel p-2.5 font-mono text-xs text-amber-dim">
             <span className="truncate pr-8 select-all">{psWindows}</span>
             <button
@@ -373,9 +383,9 @@ function InstallSection() {
             <button
               type="button"
               onClick={() => handleCopy(psWindows)}
-              className="flex h-9 flex-1 items-center justify-center gap-2 rounded-xl bg-amber px-3 text-xs font-semibold text-ink active:scale-[0.98]"
+              className="flex h-9 flex-1 items-center justify-center gap-2 rounded-xl border border-line px-3 text-xs font-semibold text-bone hover:border-amber active:scale-[0.98]"
             >
-              {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+              {copied ? <Check className="size-3.5 text-moss" /> : <Copy className="size-3.5" />}
               {copied ? "¡Comando copiado!" : "Copiar comando PowerShell"}
             </button>
             <a
@@ -385,7 +395,7 @@ function InstallSection() {
               className="flex h-9 items-center justify-center gap-1.5 rounded-xl border border-line px-3 text-xs font-semibold text-bone hover:border-amber"
             >
               <Download className="size-3.5" />
-              ZIP (exe)
+              ZIP Portable
             </a>
           </div>
         </div>
@@ -393,31 +403,31 @@ function InstallSection() {
 
       {selectedOs === "android" && (
         <div className="mt-3 space-y-3">
-          <p className="text-xs text-bone-dim">Instala PapuWhats como aplicación nativa en tu móvil Android:</p>
+          <p className="text-xs text-bone-dim">Descarga el APK oficial con permisos de cámara, audio y notificaciones:</p>
+          <a
+            href="https://github.com/lospapusXDD/papuwhats-web/releases/download/v1.0.0/PapuWhats.apk"
+            target="_blank"
+            rel="noreferrer"
+            className="flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-amber px-4 text-xs font-bold text-ink shadow transition hover:bg-amber/90 active:scale-[0.98]"
+          >
+            <Download className="size-4" />
+            Descargar PapuWhats.apk (Android)
+          </a>
+          <p className="text-[11px] text-mute text-center">Instala la app directamente en cualquier teléfono o tablet Android.</p>
           {installPrompt ? (
             <button
               type="button"
               onClick={handlePwaInstall}
-              className="flex h-10 w-full items-center justify-center gap-2 rounded-xl bg-amber text-xs font-semibold text-ink active:scale-[0.98]"
+              className="flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-line px-3 text-xs font-semibold text-bone hover:border-amber active:scale-[0.98]"
             >
               <Smartphone className="size-4" />
-              Instalar PapuWhats en Android
+              Instalar versión PWA Web
             </button>
           ) : installed ? (
             <div className="rounded-xl border border-moss/40 bg-moss/10 p-3 text-xs text-moss">
               ✓ ¡PapuWhats ya está instalada en tu dispositivo!
             </div>
-          ) : (
-            <div className="rounded-xl border border-line bg-panel p-3 text-xs text-mute space-y-1.5">
-              <p className="font-semibold text-bone">Instrucciones para Chrome / Brave / Edge:</p>
-              <p>1. Toca en el menú de 3 puntos (⋮) en la esquina superior derecha.</p>
-              <p>
-                2. Selecciona <span className="font-semibold text-amber">"Instalar aplicación"</span> o{" "}
-                <span className="font-semibold text-amber">"Añadir a pantalla de inicio"</span>.
-              </p>
-              <p>3. ¡Listo! Se creará el acceso directo con icono oficial.</p>
-            </div>
-          )}
+          ) : null}
         </div>
       )}
 
