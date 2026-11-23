@@ -9,6 +9,8 @@ import { notifyUser } from "@/lib/papu/notify";
 import type { Account, AppView, Chat, LiveCall, Message, PendingAuth, Tone, UserData } from "@/lib/papu/types";
 
 const lastSeenConvs = new Map<string, number>();
+const lastSeenIncomingReqs = new Set<string>();
+const lastSeenFriends = new Set<string>();
 
 type PapuState = {
   accounts: Account[];
@@ -823,6 +825,16 @@ export const usePapu = create<PapuState>()(
                 cleanupCall();
                 set({ call: null });
               }
+            } else if (currentCall.phase === "incoming") {
+              if (!callInfo?.incoming || callInfo.incoming.id !== currentCall.id) {
+                stopRing();
+                cleanupCall();
+                set({ call: null });
+                void notifyUser(`📞 Llamada perdida`, {
+                  body: `Llamada perdida de ${currentCall.chatId}`,
+                  tag: `missed-${currentCall.id}`,
+                });
+              }
             } else if (currentCall.phase === "active") {
               if (!callInfo?.active || callInfo.active.id !== currentCall.id || callInfo.active.status === "ended" || callInfo.active.status === "declined") {
                 stopRing();
@@ -830,6 +842,36 @@ export const usePapu = create<PapuState>()(
                 finishCall(set, get);
               }
             }
+          }
+
+          // Notificar solicitudes de amistad entrantes nuevas ("alguien te envió solicitud")
+          if (Array.isArray(friendsData?.incoming)) {
+            friendsData.incoming.forEach((req: any) => {
+              const reqId = String(req.id || req.from_nick);
+              if (!lastSeenIncomingReqs.has(reqId) && lastSeenIncomingReqs.size > 0) {
+                if (soundOn(get)) playReceive();
+                void notifyUser(`👋 Solicitud de amistad`, {
+                  body: `${req.from_nick} quiere agregarte en PapuWhats`,
+                  tag: `friend-req-${reqId}`,
+                });
+              }
+              lastSeenIncomingReqs.add(reqId);
+            });
+          }
+
+          // Notificar cuando alguien aceptó tu solicitud ("alguien aceptó tu amistad")
+          if (Array.isArray(friendsData?.friends)) {
+            friendsData.friends.forEach((fr: any) => {
+              const fNick = String(fr.friend_nick);
+              if (!lastSeenFriends.has(fNick) && lastSeenFriends.size > 0) {
+                if (soundOn(get)) playReceive();
+                void notifyUser(`🎉 ¡Amistad aceptada!`, {
+                  body: `Ahora eres amigo de ${fNick} en PapuWhats`,
+                  tag: `friend-acc-${fNick}`,
+                });
+              }
+              lastSeenFriends.add(fNick);
+            });
           }
 
           const contactNicks = new Set<string>();
@@ -864,15 +906,28 @@ export const usePapu = create<PapuState>()(
             };
           });
 
-          // Notificar mensajes nuevos de otros contactos en segundo plano
+          // Notificar mensajes nuevos de otros contactos en segundo plano con vista previa
           convs.forEach((c) => {
             const unread = Number(c.unread_count) || 0;
             const lastAt = new Date(c.last_message_at).getTime();
             const prevAt = lastSeenConvs.get(c.contact) || 0;
             if (c.contact !== activeChat && unread > 0 && lastAt > prevAt && prevAt > 0) {
               if (soundOn(get)) playReceive();
-              void notifyUser(c.contact, {
-                body: `Nuevo mensaje de ${c.contact}`,
+              let bodyPreview = `Nuevo mensaje de ${c.contact}`;
+              if (c.last_message) {
+                try {
+                  const parsed = JSON.parse(c.last_message);
+                  if (parsed.kind === "image") bodyPreview = "📷 Foto";
+                  else if (parsed.kind === "video") bodyPreview = "🎬 Video";
+                  else if (parsed.kind === "voice") bodyPreview = "🎙️ Nota de voz";
+                  else if (parsed.kind === "file") bodyPreview = "📄 " + (parsed.mediaName || "Archivo");
+                  else if (parsed.body) bodyPreview = parsed.body;
+                } catch {
+                  bodyPreview = c.last_message.slice(0, 80);
+                }
+              }
+              void notifyUser(`💬 ${c.contact}`, {
+                body: bodyPreview,
                 tag: `msg-${c.contact}`,
               });
             }

@@ -24,6 +24,7 @@ export type ApiConversation = {
   contact: string;
   last_message_at: string;
   unread_count: number;
+  last_message?: string;
 };
 
 export type ApiFriend = {
