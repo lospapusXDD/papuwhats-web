@@ -63,7 +63,16 @@ export function CallOverlay() {
   useEffect(() => {
     if (call?.phase !== "active") return;
     const timer = window.setInterval(() => setNow(Date.now()), 1000);
-    return () => window.clearInterval(timer);
+    let wakeLockSentinel: any = null;
+    if ("wakeLock" in navigator && typeof (navigator as any).wakeLock?.request === "function") {
+      (navigator as any).wakeLock.request("screen").then((sentinel: any) => {
+        wakeLockSentinel = sentinel;
+      }).catch(() => {});
+    }
+    return () => {
+      window.clearInterval(timer);
+      wakeLockSentinel?.release().catch(() => {});
+    };
   }, [call?.phase, call?.id]);
 
   useEffect(() => {

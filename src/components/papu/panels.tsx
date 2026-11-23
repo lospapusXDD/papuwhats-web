@@ -538,6 +538,21 @@ export function Settings() {
           </div>
         </div>
         <div className="flex items-start gap-3 rounded-3xl border border-line bg-ink p-4">
+          <Smartphone className="mt-0.5 size-5 shrink-0 text-amber" aria-hidden="true" />
+          <div className="min-w-0">
+            <p className="font-semibold">Batería en Celular (Segundo plano sin restricciones)</p>
+            <p className="mt-1 text-xs text-bone-dim leading-relaxed">
+              En Android, para que el sistema no suspenda la app al bloquear la pantalla:
+            </p>
+            <ol className="mt-2 list-decimal space-y-1 pl-4 text-xs text-mute">
+              <li>Mantén presionado el icono de <b className="text-bone">PapuWhats</b> en tu pantalla y toca <b className="text-bone">Info de la app (ℹ️)</b>.</li>
+              <li>Entra en <b className="text-bone">Batería</b> (o Uso de batería de la app).</li>
+              <li>Elige la opción <b className="text-amber">"Sin restricciones"</b> (o "No optimizar").</li>
+            </ol>
+            <p className="mt-2 text-xs text-bone-dim">¡Con esto las llamadas y mensajes sonarán de inmediato 24/7 sin retrasos!</p>
+          </div>
+        </div>
+        <div className="flex items-start gap-3 rounded-3xl border border-line bg-ink p-4">
           <ShieldCheck className="mt-0.5 size-5 shrink-0 text-amber" aria-hidden="true" />
           <div>
             <p className="font-semibold">Verificación en dos pasos (2FA)</p>
