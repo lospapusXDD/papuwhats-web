@@ -31,14 +31,24 @@ export async function notifyUser(
     requireInteraction?: boolean;
   } = {}
 ) {
-  if (typeof window === "undefined" || !("Notification" in window)) return;
+  if (typeof window === "undefined") return;
 
-  if (Notification.permission === "default") {
-    const granted = await requestNotificationPermission();
-    if (!granted) return;
+  const isElectron =
+    typeof navigator !== "undefined" &&
+    (navigator.userAgent.toLowerCase().includes("electron") || Boolean((window as any).process?.versions?.electron));
+
+  // En navegadores web tradicionales, verificar permisos
+  if (!isElectron) {
+    if ("Notification" in window && Notification.permission === "default") {
+      try {
+        const granted = await requestNotificationPermission();
+        if (!granted) return;
+      } catch {}
+    }
+    if ("Notification" in window && Notification.permission !== "granted") {
+      return;
+    }
   }
-
-  if (Notification.permission !== "granted") return;
 
   const base = typeof window !== "undefined" ? window.location.origin + window.location.pathname.replace(/\/+$/, "") : "";
   const iconUrl = options.icon || `${base}/icon-192.png`;
@@ -51,30 +61,49 @@ export async function notifyUser(
     tag: options.tag || "papuwhats-msg",
     vibrate: [200, 100, 200, 100, 250],
     requireInteraction: options.requireInteraction ?? (options.tag === "call"),
-    data: options.data || { url: window.location.href },
+    data: options.data || { url: typeof window !== "undefined" ? window.location.href : "" },
   };
 
-  // 1. Mandatory for Android / PWA in background: ServiceWorkerRegistration.showNotification()
-  try {
-    if ("serviceWorker" in navigator) {
-      const reg = await navigator.serviceWorker.ready;
-      if (reg && typeof reg.showNotification === "function") {
+  // 1. En Electron: emitir la notificación nativa DIRECTA (sin depender de ServiceWorker)
+  if (isElectron) {
+    try {
+      const n = new Notification(title, notifOptions);
+      n.onclick = () => {
+        window.focus();
+        n.close();
+      };
+      return;
+    } catch (err) {
+      console.warn("[Electron Notification error]:", err);
+    }
+  }
+
+  // 2. En móviles Android / PWA: usar el Service Worker activo si existe (sin bloquear)
+  if ("serviceWorker" in navigator) {
+    try {
+      const reg = await Promise.race([
+        navigator.serviceWorker.getRegistration(),
+        new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 300)),
+      ]);
+      if (reg && reg.active && typeof reg.showNotification === "function") {
         await reg.showNotification(title, notifOptions);
         return;
       }
+    } catch (swErr) {
+      console.warn("[SW showNotification error]:", swErr);
     }
-  } catch (swErr) {
-    console.warn("[SW Notification warning]:", swErr);
   }
 
-  // 2. Desktop fallback (Electron, Windows, Linux, Mac browsers)
-  try {
-    const n = new Notification(title, notifOptions);
-    n.onclick = () => {
-      window.focus();
-      n.close();
-    };
-  } catch (nErr) {
-    console.warn("[Standard Notification warning]:", nErr);
+  // 3. Fallback directo en escritorio / navegador estándar
+  if ("Notification" in window && (isElectron || Notification.permission === "granted")) {
+    try {
+      const n = new Notification(title, notifOptions);
+      n.onclick = () => {
+        window.focus();
+        n.close();
+      };
+    } catch (nErr) {
+      console.warn("[Standard Notification fallback]:", nErr);
+    }
   }
 }

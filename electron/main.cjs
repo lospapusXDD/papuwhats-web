@@ -7,7 +7,7 @@ let isQuitting = false;
 
 // Configurar App ID para notificaciones nativas en Windows
 if (process.platform === 'win32') {
-  app.setAppUserModelId('com.papusbank.papuwhats');
+  app.setAppUserModelId(process.execPath || 'com.papusbank.papuwhats');
 }
 
 // Mantener ejecución activa y fluida en segundo plano
