@@ -5,7 +5,10 @@ import { craftReply } from "@/lib/papu/replies";
 import { DEMO_EMAIL, DEMO_ID, DEMO_PASSWORD, demoAccount, demoData, freshData } from "@/lib/papu/seed";
 import { PapuApi, type ApiMessage } from "@/lib/papu/api";
 import { initCallPeer, cleanupCall, setLocalAudioMuted, setLocalCameraEnabled } from "@/lib/papu/webrtc";
+import { notifyUser } from "@/lib/papu/notify";
 import type { Account, AppView, Chat, LiveCall, Message, PendingAuth, Tone, UserData } from "@/lib/papu/types";
+
+const lastSeenConvs = new Map<string, number>();
 
 type PapuState = {
   accounts: Account[];
@@ -791,18 +794,11 @@ export const usePapu = create<PapuState>()(
                 },
               });
               if (soundOn(get)) startRing();
-              if (typeof window !== "undefined" && "Notification" in window) {
-                if (Notification.permission === "granted") {
-                  try {
-                    new Notification(`📞 Llamada de ${inc.from}`, {
-                      body: `Llamada de ${inc.kind === "video" ? "video" : "voz"} entrante en PapuWhats`,
-                      icon: "/icon-192.png",
-                    });
-                  } catch {}
-                } else if (Notification.permission === "default") {
-                  void Notification.requestPermission();
-                }
-              }
+              void notifyUser(`📞 Llamada de ${inc.from}`, {
+                body: `Llamada de ${inc.kind === "video" ? "video" : "voz"} entrante en PapuWhats`,
+                tag: "call",
+                requireInteraction: true,
+              });
             }
           } else if (currentCall) {
             if (currentCall.phase === "outgoing") {
@@ -868,6 +864,21 @@ export const usePapu = create<PapuState>()(
             };
           });
 
+          // Notificar mensajes nuevos de otros contactos en segundo plano
+          convs.forEach((c) => {
+            const unread = Number(c.unread_count) || 0;
+            const lastAt = new Date(c.last_message_at).getTime();
+            const prevAt = lastSeenConvs.get(c.contact) || 0;
+            if (c.contact !== activeChat && unread > 0 && lastAt > prevAt && prevAt > 0) {
+              if (soundOn(get)) playReceive();
+              void notifyUser(c.contact, {
+                body: `Nuevo mensaje de ${c.contact}`,
+                tag: `msg-${c.contact}`,
+              });
+            }
+            lastSeenConvs.set(c.contact, lastAt);
+          });
+
           // Si hay chat activo, traer los mensajes
           const activeChat = get().activeChatId;
           if (activeChat && activeChat !== "valeria" && activeChat !== "mateo") {
@@ -884,18 +895,10 @@ export const usePapu = create<PapuState>()(
                 if (soundOn(get) && !curChat?.muted) {
                   playReceive();
                 }
-                if (typeof window !== "undefined" && "Notification" in window) {
-                  if (Notification.permission === "granted") {
-                    try {
-                      new Notification(curChat?.title || "PapuWhats", {
-                        body: lastNew.body || (lastNew.kind === "voice" ? "🎙️ Nota de voz" : lastNew.kind === "video" ? "🎬 Video" : "Nuevo mensaje"),
-                        icon: "/icon-192.png",
-                      });
-                    } catch {}
-                  } else if (Notification.permission === "default") {
-                    void Notification.requestPermission();
-                  }
-                }
+                void notifyUser(curChat?.title || lastNew.senderName || "PapuWhats", {
+                  body: lastNew.body || (lastNew.kind === "voice" ? "🎙️ Nota de voz" : lastNew.kind === "video" ? "🎬 Video" : "Nuevo mensaje"),
+                  tag: `msg-${activeChat}`,
+                });
               }
 
               patchUser(set, get, (data) => ({
@@ -931,12 +934,28 @@ export const usePapu = create<PapuState>()(
   ),
 );
 
-// Polling en segundo plano cada 2s para recibir mensajes y llamadas en tiempo real
+// Polling en segundo plano con Web Worker (no se congela al minimizar o bloquear pantalla)
 if (typeof window !== "undefined") {
-  setInterval(() => {
+  const poll = () => {
     const state = usePapu.getState();
-    if (state.sessionUserId && !document.hidden) {
+    if (state.sessionUserId) {
       void state.syncFromApi();
     }
-  }, 2000);
+  };
+
+  try {
+    const workerBlob = new Blob(
+      [
+        `setInterval(function() { postMessage('tick'); }, 2000);`,
+      ],
+      { type: "application/javascript" },
+    );
+    const workerUrl = URL.createObjectURL(workerBlob);
+    const worker = new Worker(workerUrl);
+    worker.onmessage = () => {
+      poll();
+    };
+  } catch {
+    setInterval(poll, 2000);
+  }
 }

@@ -5,6 +5,7 @@ import { formatDuration, listTime } from "@/lib/papu/format";
 import { STORIES } from "@/lib/papu/seed";
 import { usePapu, nickToTone } from "@/lib/papu/store";
 import { PapuApi } from "@/lib/papu/api";
+import { notifyUser, requestNotificationPermission } from "@/lib/papu/notify";
 import type { Story, Tone } from "@/lib/papu/types";
 import { Avatar } from "@/components/papu/avatar";
 
@@ -508,6 +509,33 @@ export function Settings() {
           >
             <span className={cn("size-5 rounded-full bg-bone transition-transform duration-150", data?.sound !== false && "translate-x-5")} />
           </button>
+        </div>
+        <div className="flex flex-col gap-3 rounded-3xl border border-line bg-ink p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <Bell className="size-5 shrink-0 text-amber" />
+              <div>
+                <p className="font-semibold">Notificaciones en segundo plano</p>
+                <p className="text-sm text-mute">Recibe llamadas y mensajes al minimizar o bloquear pantalla</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="shrink-0 rounded-full bg-amber/20 px-3.5 py-1.5 text-xs font-semibold text-amber hover:bg-amber hover:text-ink transition active:scale-95 cursor-pointer"
+              onClick={async () => {
+                const granted = await requestNotificationPermission();
+                if (granted) {
+                  void notifyUser("🔔 PapuWhats", {
+                    body: "¡Las notificaciones en segundo plano están activas y funcionando!",
+                  });
+                } else {
+                  alert("Permiso denegado. Permite las notificaciones en el icono de candado o en los ajustes del navegador.");
+                }
+              }}
+            >
+              Probar aviso
+            </button>
+          </div>
         </div>
         <div className="flex items-start gap-3 rounded-3xl border border-line bg-ink p-4">
           <ShieldCheck className="mt-0.5 size-5 shrink-0 text-amber" aria-hidden="true" />
