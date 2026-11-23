@@ -118,13 +118,9 @@ export function CallOverlay() {
       ) : null}
 
       {/* Cámara local flotante Picture-in-Picture (PiP) en la esquina */}
-      {call.cameraOn ? (
+      {call.cameraOn && localStream && localStream.getVideoTracks().length > 0 ? (
         <div className="fixed bottom-28 right-5 z-30 w-32 sm:w-44 aspect-[3/4] overflow-hidden rounded-2xl border-2 border-amber/70 bg-panel shadow-2xl transition-all">
-          {camError ? (
-            <p className="flex h-full items-center justify-center p-3 text-center text-xs text-mute">Cámara no disponible</p>
-          ) : (
-            <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover -scale-x-100" />
-          )}
+          <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover -scale-x-100" />
         </div>
       ) : null}
 

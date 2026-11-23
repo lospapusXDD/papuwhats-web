@@ -42,6 +42,51 @@ const RTC_CONFIG: RTCConfiguration = {
   ],
 };
 
+async function acquireLocalStream(kind: "voice" | "video"): Promise<MediaStream | null> {
+  const getMedia =
+    navigator.mediaDevices?.getUserMedia?.bind(navigator.mediaDevices) ||
+    (navigator as any).getUserMedia?.bind(navigator) ||
+    (navigator as any).webkitGetUserMedia?.bind(navigator) ||
+    (navigator as any).mozGetUserMedia?.bind(navigator);
+
+  if (!getMedia) {
+    console.warn("[WebRTC] getUserMedia no soportado en este entorno");
+    return null;
+  }
+
+  if (kind === "video") {
+    // 1. Intentar obtener ambos: audio y cámara
+    try {
+      return await getMedia({ audio: true, video: true });
+    } catch (err) {
+      console.warn("[WebRTC] Falló audio+video juntos (dispositivo sin cámara o permiso denegado). Intentando solo micrófono...", err);
+    }
+
+    // 2. Si no tiene cámara (ej: PC de escritorio con micrófono/auriculares), obtener solo micrófono
+    try {
+      return await getMedia({ audio: true, video: false });
+    } catch (audioErr) {
+      console.warn("[WebRTC] Falló micrófono. Intentando solo cámara...", audioErr);
+    }
+
+    // 3. Si tiene cámara pero no micrófono
+    try {
+      return await getMedia({ audio: false, video: true });
+    } catch (videoErr) {
+      console.warn("[WebRTC] No se pudo obtener ningún dispositivo de medios:", videoErr);
+      return null;
+    }
+  } else {
+    // Llamada solo de voz
+    try {
+      return await getMedia({ audio: true, video: false });
+    } catch (err) {
+      console.warn("[WebRTC] No se pudo obtener micrófono para llamada de voz:", err);
+      return null;
+    }
+  }
+}
+
 export async function initCallPeer(
   callId: string,
   isCaller: boolean,
@@ -50,15 +95,7 @@ export async function initCallPeer(
 ): Promise<MediaStream | null> {
   cleanupCall();
 
-  try {
-    localStream = await navigator.mediaDevices.getUserMedia({
-      audio: true,
-      video: kind === "video",
-    });
-  } catch (err) {
-    console.warn("[Call] No se pudo acceder a micrófono/cámara:", err);
-    localStream = null;
-  }
+  localStream = await acquireLocalStream(kind);
   localStreamListeners.forEach((fn) => fn(localStream));
 
   pc = new RTCPeerConnection(RTC_CONFIG);
@@ -67,21 +104,42 @@ export async function initCallPeer(
     localStream.getTracks().forEach((track) => pc?.addTrack(track, localStream!));
   }
 
-  pc.ontrack = (event) => {
-    const stream = event.streams[0];
-    if (stream) {
-      remoteStream = stream;
-      streamListeners.forEach((fn) => fn(stream));
+  // Si no tenemos cámara local pero es videollamada, agregamos un transceptor recvonly para poder recibir video de la otra persona
+  if (kind === "video" && (!localStream || localStream.getVideoTracks().length === 0)) {
+    try {
+      pc.addTransceiver("video", { direction: "recvonly" });
+    } catch {}
+  }
+  // Si no tenemos micrófono local, agregamos un transceptor recvonly para poder recibir audio
+  if (!localStream || localStream.getAudioTracks().length === 0) {
+    try {
+      pc.addTransceiver("audio", { direction: "recvonly" });
+    } catch {}
+  }
 
-      if (!remoteAudio) {
-        remoteAudio = document.createElement("audio");
-        remoteAudio.autoplay = true;
-        document.body.appendChild(remoteAudio);
+  pc.ontrack = (event) => {
+    let stream = event.streams[0];
+    if (!stream) {
+      if (!remoteStream) {
+        remoteStream = new MediaStream();
       }
-      remoteAudio.srcObject = stream;
-      void remoteAudio.play().catch(() => {});
-      if (onRemoteStream) onRemoteStream(stream);
+      remoteStream.addTrack(event.track);
+      stream = remoteStream;
+    } else {
+      remoteStream = stream;
     }
+
+    streamListeners.forEach((fn) => fn(stream));
+
+    if (!remoteAudio) {
+      remoteAudio = document.createElement("audio");
+      remoteAudio.autoplay = true;
+      (remoteAudio as any).playsInline = true;
+      document.body.appendChild(remoteAudio);
+    }
+    remoteAudio.srcObject = stream;
+    void remoteAudio.play().catch(() => {});
+    if (onRemoteStream) onRemoteStream(stream);
   };
 
   pc.onicecandidate = (event) => {
