@@ -27,6 +27,7 @@ export function formatDuration(ms: number) {
 
 export function previewText(message: Message) {
   if (message.kind === "image") return "Imagen";
+  if (message.kind === "video") return "Video";
   if (message.kind === "voice") return "Nota de voz";
   if (message.kind === "file") return message.mediaName || "Archivo";
   if (message.kind === "call") {

@@ -25,7 +25,7 @@ type PapuState = {
     password: string;
     confirm?: string;
   }) => Promise<{ ok: true } | { ok: false; error: string }>;
-  resendCode: () => void;
+  resendCode: () => Promise<{ ok: boolean; message?: string; error?: string }>;
   cancelAuth: () => void;
   completeAuth: (code: string) => Promise<{ ok: true } | { ok: false; error: string }>;
   logout: () => void;
@@ -40,7 +40,7 @@ type PapuState = {
   updateProfile: (name: string, about: string) => void;
   setMyStatus: (text: string) => void;
   sendText: (body: string) => void;
-  sendMedia: (input: { kind: "image" | "file" | "voice"; body: string; mediaUrl?: string; mediaName?: string; durationMs?: number }) => void;
+  sendMedia: (input: { kind: "image" | "file" | "voice" | "video"; body: string; mediaUrl?: string; mediaName?: string; durationMs?: number }) => void;
   deleteMessage: (chatId: string, messageId: string) => void;
   startOutgoing: (chatId: string, kind: "voice" | "video") => void;
   startIncoming: (chatId: string) => void;
@@ -318,10 +318,13 @@ export const usePapu = create<PapuState>()(
         return { ok: true };
       },
 
-      resendCode: () => {
+      resendCode: async () => {
         const pending = get().pending;
-        if (!pending) return;
-        set({ pending: { ...pending, code: six() } });
+        if (!pending) return { ok: false, error: "No hay una verificación abierta." };
+        if (pending.tempToken) {
+          return await PapuApi.resend2FA(pending.tempToken);
+        }
+        return { ok: true, message: "Código actualizado." };
       },
 
       cancelAuth: () => set({ pending: null }),
@@ -788,6 +791,18 @@ export const usePapu = create<PapuState>()(
                 },
               });
               if (soundOn(get)) startRing();
+              if (typeof window !== "undefined" && "Notification" in window) {
+                if (Notification.permission === "granted") {
+                  try {
+                    new Notification(`📞 Llamada de ${inc.from}`, {
+                      body: `Llamada de ${inc.kind === "video" ? "video" : "voz"} entrante en PapuWhats`,
+                      icon: "/icon-192.png",
+                    });
+                  } catch {}
+                } else if (Notification.permission === "default") {
+                  void Notification.requestPermission();
+                }
+              }
             }
           } else if (currentCall) {
             if (currentCall.phase === "outgoing") {
@@ -868,6 +883,18 @@ export const usePapu = create<PapuState>()(
               if (lastNew && lastNew.author === "them" && (!lastPrev || String(lastPrev.id) !== String(lastNew.id))) {
                 if (soundOn(get) && !curChat?.muted) {
                   playReceive();
+                }
+                if (typeof window !== "undefined" && "Notification" in window) {
+                  if (Notification.permission === "granted") {
+                    try {
+                      new Notification(curChat?.title || "PapuWhats", {
+                        body: lastNew.body || (lastNew.kind === "voice" ? "🎙️ Nota de voz" : lastNew.kind === "video" ? "🎬 Video" : "Nuevo mensaje"),
+                        icon: "/icon-192.png",
+                      });
+                    } catch {}
+                  } else if (Notification.permission === "default") {
+                    void Notification.requestPermission();
+                  }
                 }
               }
 

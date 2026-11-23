@@ -3,7 +3,7 @@ import { Mic, MicOff, Phone, PhoneOff, Video, VideoOff } from "lucide-react";
 import { formatDuration } from "@/lib/papu/format";
 import { usePapu } from "@/lib/papu/store";
 import { Avatar } from "@/components/papu/avatar";
-import { onRemoteStreamChange } from "@/lib/papu/webrtc";
+import { onLocalStreamChange, onRemoteStreamChange } from "@/lib/papu/webrtc";
 
 export function CallOverlay() {
   const call = usePapu((s) => s.call);
@@ -15,10 +15,21 @@ export function CallOverlay() {
   const setCamera = usePapu((s) => s.setCamera);
   const videoRef = useRef<HTMLVideoElement>(null);
   const remoteVideoRef = useRef<HTMLVideoElement>(null);
+  const remoteAudioRef = useRef<HTMLAudioElement>(null);
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [localStream, setLocalStream] = useState<MediaStream | null>(null);
   const [now, setNow] = useState(() => Date.now());
   const [camError, setCamError] = useState(false);
   const chat = data?.chats.find((item) => item.id === call?.chatId);
+
+  useEffect(() => {
+    return onLocalStreamChange((stream) => {
+      setLocalStream(stream);
+      if (videoRef.current && stream) {
+        videoRef.current.srcObject = stream;
+      }
+    });
+  }, []);
 
   useEffect(() => {
     return onRemoteStreamChange((stream) => {
@@ -26,12 +37,26 @@ export function CallOverlay() {
       if (remoteVideoRef.current && stream) {
         remoteVideoRef.current.srcObject = stream;
       }
+      if (remoteAudioRef.current && stream) {
+        remoteAudioRef.current.srcObject = stream;
+        void remoteAudioRef.current.play().catch(() => {});
+      }
     });
   }, []);
 
   useEffect(() => {
+    if (videoRef.current && localStream) {
+      videoRef.current.srcObject = localStream;
+    }
+  }, [localStream]);
+
+  useEffect(() => {
     if (remoteVideoRef.current && remoteStream) {
       remoteVideoRef.current.srcObject = remoteStream;
+    }
+    if (remoteAudioRef.current && remoteStream) {
+      remoteAudioRef.current.srcObject = remoteStream;
+      void remoteAudioRef.current.play().catch(() => {});
     }
   }, [remoteStream]);
 
@@ -46,10 +71,16 @@ export function CallOverlay() {
       setCamError(false);
       return;
     }
+    // Si ya tenemos track de video en localStream, listo
+    if (localStream && localStream.getVideoTracks().length > 0) {
+      if (videoRef.current) videoRef.current.srcObject = localStream;
+      return;
+    }
+    // Fallback si no había video iniciado
     let stream: MediaStream | null = null;
     let cancelled = false;
     navigator.mediaDevices
-      .getUserMedia({ video: true, audio: false })
+      ?.getUserMedia({ video: true, audio: false })
       .then((next) => {
         if (cancelled) {
           next.getTracks().forEach((track) => track.stop());
@@ -65,7 +96,7 @@ export function CallOverlay() {
       cancelled = true;
       stream?.getTracks().forEach((track) => track.stop());
     };
-  }, [call?.cameraOn, call?.id]);
+  }, [call?.cameraOn, call?.id, localStream]);
 
   if (!call || !chat) return null;
   const status =
@@ -75,10 +106,25 @@ export function CallOverlay() {
 
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-ink text-bone overflow-hidden">
+      {/* Audio remoto oculto para asegurar reproducción de voz */}
+      <audio ref={remoteAudioRef} autoPlay playsInline className="hidden" />
+
+      {/* Video remoto en pantalla completa si la otra persona tiene cámara */}
       {hasRemoteVideo ? (
         <div className="absolute inset-0 z-0">
           <video ref={remoteVideoRef} autoPlay playsInline className="h-full w-full object-cover" />
-          <div className="absolute inset-0 bg-ink/40" />
+          <div className="absolute inset-0 bg-ink/30" />
+        </div>
+      ) : null}
+
+      {/* Cámara local flotante Picture-in-Picture (PiP) en la esquina */}
+      {call.cameraOn ? (
+        <div className="fixed bottom-28 right-5 z-30 w-32 sm:w-44 aspect-[3/4] overflow-hidden rounded-2xl border-2 border-amber/70 bg-panel shadow-2xl transition-all">
+          {camError ? (
+            <p className="flex h-full items-center justify-center p-3 text-center text-xs text-mute">Cámara no disponible</p>
+          ) : (
+            <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover -scale-x-100" />
+          )}
         </div>
       ) : null}
 
@@ -95,15 +141,6 @@ export function CallOverlay() {
           {call.kind === "video" ? "Video" : "Voz"} · <span className="tabular-nums">{status}</span>
         </p>
         {call.muted ? <p className="mt-2 text-sm text-mute">Micrófono en silencio</p> : null}
-        {call.cameraOn ? (
-          <div className="mt-6 h-40 w-28 overflow-hidden rounded-2xl border border-line bg-panel shadow-2xl">
-            {camError ? (
-              <p className="flex h-full items-center px-3 text-xs text-mute">Cámara no disponible</p>
-            ) : (
-              <video ref={videoRef} autoPlay playsInline muted className="h-full w-full object-cover" />
-            )}
-          </div>
-        ) : null}
       </div>
       <div className="safe-bottom flex items-center justify-center gap-6 px-6 pt-4 pb-10">
         {call.phase === "incoming" ? (

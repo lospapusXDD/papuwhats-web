@@ -23,18 +23,23 @@ export function Updates() {
   const [apiStatuses, setApiStatuses] = useState<Array<{ id: number | string; nick: string; text: string; created_at: string }>>([]);
   const [submitting, setSubmitting] = useState(false);
 
-  const isRealUser = Boolean(sessionUserId && sessionUserId !== "demo");
+  const currentNick = (sessionUserId && sessionUserId !== "demo") ? sessionUserId : (typeof window !== "undefined" ? localStorage.getItem("papuwhats_nick") : null);
 
   useEffect(() => {
-    if (isRealUser) {
+    const fetchStatuses = () => {
       void PapuApi.getStatuses().then((res) => {
-        setApiStatuses(res || []);
+        if (Array.isArray(res)) {
+          setApiStatuses(res);
+        }
       });
-    }
-  }, [isRealUser]);
+    };
+    fetchStatuses();
+    const timer = window.setInterval(fetchStatuses, 10000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   const stories: Story[] = useMemo(() => {
-    if (!isRealUser) {
+    if (!apiStatuses.length) {
       const mine: Story | null = data?.myStatus
         ? { id: "mine", name: account?.name || "Tú", tone: "amber", text: data.myStatus.text, minutesAgo: Math.max(1, Math.round((Date.now() - data.myStatus.at) / 60000)) }
         : null;
@@ -43,12 +48,12 @@ export function Updates() {
 
     return apiStatuses.map((s) => ({
       id: String(s.id),
-      name: s.nick === sessionUserId ? "Tú" : s.nick,
+      name: (currentNick && s.nick.toLowerCase() === currentNick.toLowerCase()) ? "Tú" : s.nick,
       tone: nickToTone(s.nick),
       text: s.text,
       minutesAgo: Math.max(1, Math.round((Date.now() - new Date(s.created_at).getTime()) / 60000)),
     }));
-  }, [isRealUser, apiStatuses, data?.myStatus, account?.name, sessionUserId]);
+  }, [apiStatuses, data?.myStatus, account?.name, currentNick]);
 
   async function handlePublish(event: React.FormEvent) {
     event.preventDefault();
@@ -57,10 +62,12 @@ export function Updates() {
     setSubmitting(true);
     setMyStatus(clean);
 
-    if (isRealUser) {
+    if (PapuApi.getToken()) {
       const res = await PapuApi.postStatus(clean);
       if (res.ok && res.status) {
         setApiStatuses((prev) => [res.status, ...prev.filter((item) => String(item.id) !== String(res.status.id))]);
+      } else if (!res.ok) {
+        alert(res.error || "No se pudo publicar el estado");
       }
     }
     setDraft("");

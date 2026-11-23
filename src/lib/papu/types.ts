@@ -11,7 +11,7 @@ export type Message = {
   id: string;
   author: "me" | "them";
   senderName?: string;
-  kind: "text" | "image" | "file" | "voice" | "call";
+  kind: "text" | "image" | "file" | "voice" | "call" | "video";
   body: string;
   createdAt: number;
   status: "sent" | "delivered" | "read";

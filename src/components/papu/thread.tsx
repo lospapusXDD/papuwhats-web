@@ -5,10 +5,12 @@ import {
   Check,
   CheckCheck,
   CornerUpLeft,
+  Download,
   FileText,
   Image as ImageIcon,
   Mic,
   MoreVertical,
+  Music,
   Paperclip,
   Pause,
   Phone,
@@ -22,7 +24,7 @@ import {
 import { cn } from "@/lib/cn";
 import { unlockAudio } from "@/lib/papu/audio";
 import { clock, dayLabel, formatDuration, presenceLabel, previewText } from "@/lib/papu/format";
-import { blobToDataUrl, fileToImageUrl, formatBytes } from "@/lib/papu/media";
+import { blobToDataUrl, fileToDataUrl, fileToImageUrl, formatBytes } from "@/lib/papu/media";
 import { usePapu } from "@/lib/papu/store";
 import type { Message } from "@/lib/papu/types";
 import { Avatar } from "@/components/papu/avatar";
@@ -48,6 +50,8 @@ export function Thread() {
   const scroller = useRef<HTMLDivElement>(null);
   const cameraRef = useRef<HTMLInputElement>(null);
   const imageRef = useRef<HTMLInputElement>(null);
+  const videoRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [text, setText] = useState("");
   const [menu, setMenu] = useState(false);
@@ -91,13 +95,26 @@ export function Thread() {
 
   const reply = chat.messages.find((message) => message.id === replyId);
 
-  async function onImage(file: File | undefined) {
+  async function handleFile(file: File | undefined) {
     if (!file) return;
+    setNotice("");
     try {
-      const mediaUrl = await fileToImageUrl(file);
-      sendMedia({ kind: "image", body: "Imagen", mediaUrl, mediaName: file.name });
-    } catch {
-      setNotice("No pude leer esa imagen.");
+      if (file.type.startsWith("image/")) {
+        const mediaUrl = await fileToImageUrl(file);
+        sendMedia({ kind: "image", body: "Imagen", mediaUrl, mediaName: file.name });
+      } else if (file.type.startsWith("video/")) {
+        const mediaUrl = await fileToDataUrl(file);
+        sendMedia({ kind: "video", body: file.name, mediaUrl, mediaName: file.name });
+      } else if (file.type.startsWith("audio/") || file.name.endsWith(".mp3") || file.name.endsWith(".wav") || file.name.endsWith(".ogg") || file.name.endsWith(".m4a")) {
+        const mediaUrl = await fileToDataUrl(file);
+        sendMedia({ kind: "voice", body: file.name, mediaUrl, mediaName: file.name, durationMs: 0 });
+      } else {
+        const mediaUrl = await fileToDataUrl(file);
+        sendMedia({ kind: "file", body: file.name, mediaUrl, mediaName: `${file.name} · ${formatBytes(file.size)}` });
+      }
+    } catch (err: any) {
+      console.warn("[Media upload error]:", err);
+      setNotice("No pude procesar el archivo seleccionado.");
     }
   }
 
@@ -192,7 +209,7 @@ export function Thread() {
       onDrop={(event) => {
         event.preventDefault();
         const file = event.dataTransfer.files?.[0];
-        if (file?.type.startsWith("image/")) void onImage(file);
+        if (file) void handleFile(file);
       }}
     >
       <header className="flex items-center gap-1 border-b border-line bg-panel px-2 py-2">
@@ -307,10 +324,12 @@ export function Thread() {
                   <Paperclip className="size-5" />
                 </button>
                 {attach ? (
-                  <div className="absolute bottom-14 left-0 z-20 w-48 rounded-2xl border border-line bg-panel-2 p-1">
-                    <MenuItem label="Imagen" icon={<ImageIcon className="size-4" />} onClick={() => { setAttach(false); imageRef.current?.click(); }} />
-                    <MenuItem label="Cámara" icon={<Camera className="size-4" />} onClick={() => { setAttach(false); cameraRef.current?.click(); }} />
-                    <MenuItem label="Archivo" icon={<FileText className="size-4" />} onClick={() => { setAttach(false); fileRef.current?.click(); }} />
+                  <div className="absolute bottom-14 left-0 z-20 w-48 rounded-2xl border border-line bg-panel-2 p-1 shadow-2xl">
+                    <MenuItem label="Foto o Imagen" icon={<ImageIcon className="size-4 text-amber" />} onClick={() => { setAttach(false); imageRef.current?.click(); }} />
+                    <MenuItem label="Video" icon={<Video className="size-4 text-amber" />} onClick={() => { setAttach(false); videoRef.current?.click(); }} />
+                    <MenuItem label="Audio / MP3" icon={<Music className="size-4 text-amber" />} onClick={() => { setAttach(false); audioRef.current?.click(); }} />
+                    <MenuItem label="Archivo" icon={<FileText className="size-4 text-amber" />} onClick={() => { setAttach(false); fileRef.current?.click(); }} />
+                    <MenuItem label="Cámara" icon={<Camera className="size-4 text-amber" />} onClick={() => { setAttach(false); cameraRef.current?.click(); }} />
                   </div>
                 ) : null}
               </div>
@@ -349,28 +368,42 @@ export function Thread() {
             </>
           )}
         </div>
-        <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={(event) => { void onImage(event.target.files?.[0]); event.target.value = ""; }} />
-        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => { void onImage(event.target.files?.[0]); event.target.value = ""; }} />
+        <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={(event) => { void handleFile(event.target.files?.[0]); event.target.value = ""; }} />
+        <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(event) => { void handleFile(event.target.files?.[0]); event.target.value = ""; }} />
+        <input ref={audioRef} type="file" accept="audio/*,.mp3,.wav,.ogg,.m4a" className="hidden" onChange={(event) => { void handleFile(event.target.files?.[0]); event.target.value = ""; }} />
+        <input ref={cameraRef} type="file" accept="image/*" capture="environment" className="hidden" onChange={(event) => { void handleFile(event.target.files?.[0]); event.target.value = ""; }} />
         <input
           ref={fileRef}
           type="file"
           className="hidden"
           onChange={(event) => {
-            const file = event.target.files?.[0];
+            void handleFile(event.target.files?.[0]);
             event.target.value = "";
-            if (!file) return;
-            if (file.type.startsWith("image/")) {
-              void onImage(file);
-              return;
-            }
-            sendMedia({ kind: "file", body: file.name, mediaName: `${file.name} · ${formatBytes(file.size)}` });
           }}
         />
       </footer>
       {zoom ? (
-        <button type="button" className="fixed inset-0 z-30 flex items-center justify-center bg-ink/90 p-6" onClick={() => setZoom(null)} aria-label="Cerrar imagen">
-          <img src={zoom} alt="Imagen ampliada" className="max-h-full max-w-full rounded-2xl object-contain" />
-        </button>
+        <div className="fixed inset-0 z-30 flex flex-col items-center justify-center bg-ink/90 p-4">
+          <img src={zoom} alt="Imagen ampliada" className="max-h-[80vh] max-w-full rounded-2xl object-contain shadow-2xl" />
+          <div className="mt-4 flex items-center gap-3">
+            <a
+              href={zoom}
+              download="imagen.jpg"
+              className="inline-flex items-center gap-2 rounded-full bg-amber px-5 py-2.5 text-sm font-semibold text-ink shadow hover:bg-amber-light active:scale-95"
+            >
+              <Download className="size-4" />
+              Descargar
+            </a>
+            <button
+              type="button"
+              className="inline-flex items-center gap-2 rounded-full border border-line bg-panel-2 px-5 py-2.5 text-sm font-medium text-bone hover:bg-ink active:scale-95"
+              onClick={() => setZoom(null)}
+            >
+              <X className="size-4" />
+              Cerrar
+            </button>
+          </div>
+        </div>
       ) : null}
     </div>
   );
@@ -422,22 +455,70 @@ function Bubble({
           </span>
         ) : null}
         {message.kind === "image" && message.mediaUrl ? (
-          <img
-            src={message.mediaUrl}
-            alt={message.body || "Imagen"}
-            className="mb-1 max-h-64 w-full rounded-lg object-cover"
-            onClick={(event) => {
-              event.stopPropagation();
-              onZoom(message.mediaUrl!);
-            }}
-          />
+          <div className="group relative mb-1">
+            <img
+              src={message.mediaUrl}
+              alt={message.body || "Imagen"}
+              className="max-h-64 w-full cursor-pointer rounded-lg object-cover"
+              onClick={(event) => {
+                event.stopPropagation();
+                onZoom(message.mediaUrl!);
+              }}
+            />
+            <a
+              href={message.mediaUrl}
+              download={message.mediaName || `imagen-${message.id}.jpg`}
+              onClick={(event) => event.stopPropagation()}
+              className="absolute bottom-2 right-2 flex size-8 items-center justify-center rounded-full bg-ink/80 text-bone shadow backdrop-blur hover:bg-amber hover:text-ink transition"
+              title="Descargar imagen"
+            >
+              <Download className="size-4" />
+            </a>
+          </div>
+        ) : null}
+        {message.kind === "video" && message.mediaUrl ? (
+          <div className="relative mb-1">
+            <video
+              src={message.mediaUrl}
+              controls
+              playsInline
+              className="max-h-64 w-full rounded-lg bg-black"
+              onClick={(event) => event.stopPropagation()}
+            />
+            <div className="mt-1 flex items-center justify-between gap-2 text-xs text-bone-dim">
+              <span className="truncate">{message.mediaName || "Video"}</span>
+              <a
+                href={message.mediaUrl}
+                download={message.mediaName || `video-${message.id}.mp4`}
+                onClick={(event) => event.stopPropagation()}
+                className="flex items-center gap-1 rounded px-1.5 py-0.5 text-bone hover:bg-ink hover:text-amber"
+                title="Descargar video"
+              >
+                <Download className="size-3.5" />
+                <span>Descargar</span>
+              </a>
+            </div>
+          </div>
         ) : null}
         {message.kind === "voice" ? <VoiceNote message={message} /> : null}
         {message.kind === "file" ? (
-          <span className="mb-1 flex items-center gap-2 text-sm">
-            <FileText className="size-4 shrink-0" aria-hidden="true" />
-            {message.mediaName || message.body}
-          </span>
+          <div className="mb-1 flex items-center justify-between gap-3 rounded-xl bg-ink/30 p-2 text-sm">
+            <span className="flex min-w-0 items-center gap-2">
+              <FileText className="size-5 shrink-0 text-amber" aria-hidden="true" />
+              <span className="truncate">{message.mediaName || message.body}</span>
+            </span>
+            {message.mediaUrl ? (
+              <a
+                href={message.mediaUrl}
+                download={message.mediaName || message.body || `archivo-${message.id}`}
+                onClick={(event) => event.stopPropagation()}
+                className="flex size-8 shrink-0 items-center justify-center rounded-full bg-ink text-bone hover:bg-amber hover:text-ink transition"
+                title="Descargar archivo"
+              >
+                <Download className="size-4" />
+              </a>
+            ) : null}
+          </div>
         ) : null}
         {message.kind === "call" ? (
           <span className="mb-1 flex items-center gap-2 text-sm">
@@ -461,6 +542,7 @@ function VoiceNote({ message }: { message: Message }) {
   const audio = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [duration, setDuration] = useState(message.durationMs ?? 0);
   const bars = useRef<number[]>([]);
   if (!bars.current.length) {
     let seed = 0;
@@ -474,6 +556,11 @@ function VoiceNote({ message }: { message: Message }) {
     unlockAudio();
     if (!audio.current) {
       const node = new Audio(message.mediaUrl);
+      node.onloadedmetadata = () => {
+        if (node.duration && !Number.isNaN(node.duration)) {
+          setDuration(Math.round(node.duration * 1000));
+        }
+      };
       node.onended = () => {
         setPlaying(false);
         setProgress(0);
@@ -493,7 +580,7 @@ function VoiceNote({ message }: { message: Message }) {
   }
 
   return (
-    <span className="flex items-center gap-3">
+    <span className="flex items-center gap-2">
       <span
         role="button"
         tabIndex={0}
@@ -502,7 +589,7 @@ function VoiceNote({ message }: { message: Message }) {
         onKeyDown={(event) => {
           if (event.key === "Enter") toggle(event as unknown as MouseEvent);
         }}
-        className="inline-flex size-9 items-center justify-center rounded-full bg-ink text-amber"
+        className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-ink text-amber hover:bg-amber hover:text-ink transition active:scale-95 cursor-pointer"
       >
         {playing ? <Pause className="size-4" /> : <Play className="size-4" />}
       </span>
@@ -515,7 +602,18 @@ function VoiceNote({ message }: { message: Message }) {
           />
         ))}
       </span>
-      <span className="text-xs tabular-nums">{formatDuration(message.durationMs ?? 0)}</span>
+      <span className="text-xs tabular-nums text-bone-dim">{formatDuration(duration)}</span>
+      {message.mediaUrl ? (
+        <a
+          href={message.mediaUrl}
+          download={message.mediaName || `audio-${message.id}.mp3`}
+          onClick={(event) => event.stopPropagation()}
+          className="inline-flex size-7 shrink-0 items-center justify-center rounded-full text-bone-dim hover:bg-ink hover:text-amber"
+          title="Descargar audio"
+        >
+          <Download className="size-3.5" />
+        </a>
+      ) : null}
     </span>
   );
 }

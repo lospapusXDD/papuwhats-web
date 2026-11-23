@@ -10,9 +10,14 @@ let remoteAudio: HTMLAudioElement | null = null;
 let pollTimer: any = null;
 const processedSignals = new Set<number>();
 let streamListeners: Array<(s: MediaStream | null) => void> = [];
+let localStreamListeners: Array<(s: MediaStream | null) => void> = [];
 
 export function getRemoteStream(): MediaStream | null {
   return remoteStream;
+}
+
+export function getLocalStream(): MediaStream | null {
+  return localStream;
 }
 
 export function onRemoteStreamChange(listener: (s: MediaStream | null) => void) {
@@ -20,6 +25,14 @@ export function onRemoteStreamChange(listener: (s: MediaStream | null) => void) 
   listener(remoteStream);
   return () => {
     streamListeners = streamListeners.filter((l) => l !== listener);
+  };
+}
+
+export function onLocalStreamChange(listener: (s: MediaStream | null) => void) {
+  localStreamListeners.push(listener);
+  listener(localStream);
+  return () => {
+    localStreamListeners = localStreamListeners.filter((l) => l !== listener);
   };
 }
 
@@ -46,6 +59,7 @@ export async function initCallPeer(
     console.warn("[Call] No se pudo acceder a micrófono/cámara:", err);
     localStream = null;
   }
+  localStreamListeners.forEach((fn) => fn(localStream));
 
   pc = new RTCPeerConnection(RTC_CONFIG);
 
@@ -138,6 +152,7 @@ export function cleanupCall() {
   }
   remoteStream = null;
   streamListeners.forEach((fn) => fn(null));
+  localStreamListeners.forEach((fn) => fn(null));
 }
 
 export function setLocalAudioMuted(muted: boolean) {

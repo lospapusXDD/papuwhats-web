@@ -24,6 +24,10 @@ export async function blobToDataUrl(blob: Blob) {
   return `data:${blob.type || "application/octet-stream"};base64,${btoa(bin)}`;
 }
 
+export async function fileToDataUrl(file: File) {
+  return blobToDataUrl(file);
+}
+
 export function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;

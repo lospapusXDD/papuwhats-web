@@ -40,7 +40,35 @@ export function AuthScreen() {
   const [digits, setDigits] = useState<string[]>(["", "", "", "", "", ""]);
   const [shake, setShake] = useState(false);
   const [done, setDone] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendStatus, setResendStatus] = useState("");
+  const [countdown, setCountdown] = useState(0);
   const refs = useRef<Array<HTMLInputElement | null>>([]);
+
+  useEffect(() => {
+    if (countdown <= 0) return;
+    const timer = setInterval(() => {
+      setCountdown((c) => Math.max(0, c - 1));
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [countdown]);
+
+  const handleResend = async () => {
+    if (resending || countdown > 0) return;
+    setResending(true);
+    setResendStatus("");
+    setError("");
+    const res = await resendCode();
+    setResending(false);
+    if (res.ok) {
+      playSuccess();
+      setResendStatus(res.message || "Nuevo código generado y enviado.");
+      setCountdown(30);
+    } else {
+      playError();
+      setError(res.error || "No se pudo generar nuevo código.");
+    }
+  };
 
   useEffect(() => {
     setDigits(["", "", "", "", "", ""]);
@@ -440,15 +468,23 @@ export function AuthScreen() {
                   >
                     {done ? "Listo" : "Verificar"}
                   </button>
+                  {resendStatus && (
+                    <p className="mt-3 text-center text-xs font-semibold text-moss">
+                      {resendStatus}
+                    </p>
+                  )}
+
                   <button
                     type="button"
-                    className="mt-3 h-10 w-full text-sm text-bone-dim hover:text-bone"
-                    onClick={() => {
-                      resendCode();
-                      playSuccess();
-                    }}
+                    disabled={resending || countdown > 0 || done}
+                    className="mt-3 h-10 w-full text-sm font-semibold text-bone-dim hover:text-amber disabled:opacity-50 transition active:scale-[0.98]"
+                    onClick={handleResend}
                   >
-                    Generar otro código
+                    {resending
+                      ? "Generando nuevo código..."
+                      : countdown > 0
+                      ? `Reenviar en ${countdown}s`
+                      : "Generar otro código"}
                   </button>
                   <AnimatePresence>
                     {done ? (

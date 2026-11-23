@@ -122,6 +122,24 @@ export const PapuApi = {
     }
   },
 
+  async resend2FA(tempToken: string): Promise<{ ok: boolean; message?: string; error?: string }> {
+    try {
+      const url = getBaseUrl() + "/papuwhats/2fa/resend";
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tempToken }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { ok: false, error: data.error || "No se pudo reenviar el código" };
+      }
+      return { ok: true, message: data.message || "Código reenviado correctamente" };
+    } catch (e: any) {
+      return { ok: false, error: e.message || "Error conectando al servidor" };
+    }
+  },
+
   async register(nick: string, password: string, email: string): Promise<{ ok: true } | { ok: false; error: string }> {
     try {
       const url = getBaseUrl() + "/api/auth/register";
